@@ -128,7 +128,7 @@ export function destroyRoom(roomId: string): void {
 }
 
 export function resetRoomToLobby(room: Room): void {
-  room.status = 'LOBBY';
+  room.status = room.players.length >= MAX_PLAYERS ? 'READY' : 'LOBBY';
   room.roundNumber = 0;
   room.roundWins = { A: 0, B: 0 };
   room.ropePosition = 0;
