@@ -25,6 +25,8 @@ export function createRoom(hostSocketId: string, nickname: string): { room: Room
     side: 'A',
     connectionStatus: 'CONNECTED',
     motionScore: 0,
+    expressionScore: 0,
+    calibrated: false,
     lastInputAt: Date.now(),
   };
 
@@ -72,15 +74,27 @@ export function joinRoom(code: string, socketId: string, nickname: string): Join
     side,
     connectionStatus: 'CONNECTED',
     motionScore: 0,
+    expressionScore: 0,
+    calibrated: false,
     lastInputAt: Date.now(),
   };
 
   room.players.push(player);
   if (room.players.length === MAX_PLAYERS) {
-    room.status = 'READY';
+    room.status = 'CALIBRATING';
   }
 
   return { ok: true, room, player };
+}
+
+/** Marks a player as having submitted their expression baseline. Returns true once everyone in the room has. */
+export function markCalibrated(room: Room, playerId: string): boolean {
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return false;
+  player.calibrated = true;
+  const allDone = room.players.length >= MAX_PLAYERS && room.players.every((p) => p.calibrated);
+  if (allDone) room.status = 'READY';
+  return allDone;
 }
 
 export function getRoom(roomId: string): Room | undefined {
@@ -112,6 +126,7 @@ export function toPublicPlayers(room: Room): PublicPlayer[] {
     nickname: p.nickname,
     side: p.side,
     connectionStatus: p.connectionStatus,
+    calibrated: p.calibrated,
   }));
 }
 
@@ -128,7 +143,11 @@ export function destroyRoom(roomId: string): void {
 }
 
 export function resetRoomToLobby(room: Room): void {
-  room.status = room.players.length >= MAX_PLAYERS ? 'READY' : 'LOBBY';
+  for (const player of room.players) {
+    player.calibrated = false;
+    player.expressionScore = 0;
+  }
+  room.status = room.players.length >= MAX_PLAYERS ? 'CALIBRATING' : 'LOBBY';
   room.roundNumber = 0;
   room.roundWins = { A: 0, B: 0 };
   room.ropePosition = 0;

@@ -1,5 +1,6 @@
 import type { Server } from 'socket.io';
 import {
+  effectivePower,
   ROPE_LIMIT,
   ROPE_SPEED,
   ROUND_RESULT_DELAY_MS,
@@ -19,13 +20,18 @@ function playerBySide(room: Room, side: Side) {
   return room.players.find((p) => p.side === side);
 }
 
+function sidePower(room: Room, side: Side): number {
+  const player = playerBySide(room, side);
+  return player ? effectivePower(player) : 0;
+}
+
 function broadcastState(io: Server, room: Room): void {
   io.to(room.id).emit('game:state', {
     tick: Date.now(),
     ropePosition: room.ropePosition,
     teamPower: {
-      A: playerBySide(room, 'A')?.motionScore ?? 0,
-      B: playerBySide(room, 'B')?.motionScore ?? 0,
+      A: sidePower(room, 'A'),
+      B: sidePower(room, 'B'),
     },
     roundNumber: room.roundNumber,
     roundWins: room.roundWins,
@@ -100,10 +106,8 @@ export function endMatch(
 }
 
 function tick(io: Server, room: Room): void {
-  const a = playerBySide(room, 'A');
-  const b = playerBySide(room, 'B');
-  const powerA = a?.motionScore ?? 0;
-  const powerB = b?.motionScore ?? 0;
+  const powerA = sidePower(room, 'A');
+  const powerB = sidePower(room, 'B');
 
   room.roundPower.A += powerA;
   room.roundPower.B += powerB;

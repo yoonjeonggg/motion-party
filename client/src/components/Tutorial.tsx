@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { usePoseMotionScore } from '../hooks/usePoseMotionScore';
+import { useMotionCapture } from '../hooks/useMotionCapture';
 import { useGameStore } from '../store/gameStore';
 
 const ALREADY_DONE_KEY = 'motionparty:onboarded';
@@ -7,8 +7,9 @@ const ROPE_SPEED = 0.35;
 const ROPE_LIMIT = 1;
 const PRACTICE_RAMP_MS = 15_000;
 const PRACTICE_TIME_LIMIT_MS = 20_000;
+const EXPRESSION_DEMO_THRESHOLD = 0.15;
 
-type Step = 'DEMO' | 'RULES' | 'PRACTICE';
+type Step = 'DEMO' | 'EXPRESSION_DEMO' | 'RULES' | 'PRACTICE';
 
 function dummyPower(elapsedMs: number): number {
   const ramp = Math.min(elapsedMs / PRACTICE_RAMP_MS, 1);
@@ -18,11 +19,13 @@ function dummyPower(elapsedMs: number): number {
 
 export function Tutorial() {
   const setScreen = useGameStore((s) => s.setScreen);
-  const { videoRef, cameraState, motionScore, poseDetected } = usePoseMotionScore(true);
+  const { videoRef, cameraState, motionScore, poseDetected, expressionScore } = useMotionCapture(true);
 
   const [step, setStep] = useState<Step>('DEMO');
   const [reachedThreshold, setReachedThreshold] = useState(false);
   const reachedRef = useRef(false);
+  const [expressionBonusShown, setExpressionBonusShown] = useState(false);
+  const expressionBonusRef = useRef(false);
   const isReplay = useRef(hasOnboarded());
 
   // Practice round state
@@ -42,6 +45,13 @@ export function Tutorial() {
       setReachedThreshold(true);
     }
   }, [motionScore]);
+
+  useEffect(() => {
+    if (step === 'EXPRESSION_DEMO' && expressionScore >= EXPRESSION_DEMO_THRESHOLD && !expressionBonusRef.current) {
+      expressionBonusRef.current = true;
+      setExpressionBonusShown(true);
+    }
+  }, [step, expressionScore]);
 
   useEffect(() => {
     if (step !== 'PRACTICE') return;
@@ -83,7 +93,10 @@ export function Tutorial() {
   }
 
   const showSkip =
-    step === 'RULES' || step === 'PRACTICE' || (step === 'DEMO' && cameraState === 'READY');
+    step === 'EXPRESSION_DEMO' ||
+    step === 'RULES' ||
+    step === 'PRACTICE' ||
+    (step === 'DEMO' && cameraState === 'READY');
 
   const ropePercent = ((ropePosition + 1) / 2) * 100;
 
@@ -131,7 +144,7 @@ export function Tutorial() {
               {reachedThreshold ? (
                 <>
                   <p className="feedback">좋아요! 이렇게 당기면 돼요 💪</p>
-                  <button type="button" className="primary" onClick={() => setStep('RULES')}>
+                  <button type="button" className="primary" onClick={() => setStep('EXPRESSION_DEMO')}>
                     다음
                   </button>
                 </>
@@ -141,6 +154,34 @@ export function Tutorial() {
             </div>
           )}
         </>
+      )}
+
+      {step === 'EXPRESSION_DEMO' && (
+        <div className="card onboarding-demo">
+          <video ref={videoRef} className="preview mirrored" muted playsInline />
+          <p className="instruction">이번엔 힘든 표정도 같이 지어보세요!</p>
+          <p className="hint small">동작만 할 때</p>
+          <div className="gauge">
+            <div className="gauge-fill" style={{ width: `${Math.round(motionScore * 100)}%` }} />
+          </div>
+          <p className="hint small">동작 + 표정</p>
+          <div className="gauge">
+            <div
+              className="gauge-fill opponent"
+              style={{ width: `${Math.round(Math.min(1, motionScore * (1 + expressionScore)) * 100)}%` }}
+            />
+          </div>
+          {expressionBonusShown ? (
+            <>
+              <p className="feedback">표정 보너스 +{Math.round(expressionScore * 100)}% 💥</p>
+              <button type="button" className="primary" onClick={() => setStep('RULES')}>
+                다음
+              </button>
+            </>
+          ) : (
+            <p className="hint">찡그리고, 입을 앙다물어보세요.</p>
+          )}
+        </div>
       )}
 
       {step === 'RULES' && (

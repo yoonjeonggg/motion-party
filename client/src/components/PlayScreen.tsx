@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { sendPower } from '../hooks/useGameSocket';
-import { usePoseMotionScore } from '../hooks/usePoseMotionScore';
+import { useMotionCapture } from '../hooks/useMotionCapture';
 import { useGameStore } from '../store/gameStore';
 import type { Side } from '../types';
 
@@ -20,14 +20,16 @@ export function PlayScreen() {
   const status = useGameStore((s) => s.status);
   const opponentDisconnected = useGameStore((s) => s.opponentDisconnected);
 
-  const { videoRef, motionScore, poseDetected } = usePoseMotionScore(true);
+  const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true);
   const scoreRef = useRef(0);
   scoreRef.current = motionScore;
+  const expressionRef = useRef(0);
+  expressionRef.current = expressionScore;
 
   useEffect(() => {
     if (!session) return;
     const interval = setInterval(() => {
-      sendPower(session.roomId, session.playerId, scoreRef.current);
+      sendPower(session.roomId, session.playerId, scoreRef.current, expressionRef.current);
     }, SEND_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [session]);
@@ -66,8 +68,14 @@ export function PlayScreen() {
           <p className="player-name">{me?.nickname ?? '나'} (나)</p>
           {!poseDetected && <p className="hint small">카메라 각도를 조정해주세요</p>}
           <div className="gauge">
-            <div className="gauge-fill" style={{ width: `${Math.round(motionScore * 100)}%` }} />
+            <div
+              className="gauge-fill"
+              style={{ width: `${Math.round(Math.min(1, motionScore * (1 + expressionScore)) * 100)}%` }}
+            />
           </div>
+          {expressionScore >= 0.05 && (
+            <p className="hint small">표정 보너스 +{Math.round(expressionScore * 100)}%</p>
+          )}
         </div>
 
         <div className="vs">VS</div>
@@ -78,7 +86,7 @@ export function PlayScreen() {
           <div className="gauge">
             <div
               className="gauge-fill opponent"
-              style={{ width: `${Math.round((teamPower[opponentSide] ?? 0) * 100)}%` }}
+              style={{ width: `${Math.round(Math.min(1, teamPower[opponentSide] ?? 0) * 100)}%` }}
             />
           </div>
         </div>

@@ -1,5 +1,6 @@
 export type RoomStatus =
   | 'LOBBY'
+  | 'CALIBRATING'
   | 'READY'
   | 'PLAYING'
   | 'ROUND_RESULT'
@@ -17,7 +18,14 @@ export interface Player {
   side: Side;
   connectionStatus: ConnectionStatus;
   motionScore: number;
+  expressionScore: number;
+  calibrated: boolean;
   lastInputAt: number;
+}
+
+/** motionScore boosted by the player's expression-intensity bonus, per FN-08. */
+export function effectivePower(player: Player): number {
+  return player.motionScore * (1 + player.expressionScore);
 }
 
 export interface Room {
@@ -42,6 +50,7 @@ export interface PublicPlayer {
   nickname: string;
   side: Side;
   connectionStatus: ConnectionStatus;
+  calibrated: boolean;
 }
 
 export const TICK_RATE_MS = 1000 / 18;

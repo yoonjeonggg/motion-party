@@ -1,5 +1,6 @@
 export type RoomStatus =
   | 'LOBBY'
+  | 'CALIBRATING'
   | 'READY'
   | 'PLAYING'
   | 'ROUND_RESULT'
@@ -7,6 +8,7 @@ export type RoomStatus =
   | 'MATCH_RESULT';
 
 export type Side = 'A' | 'B';
+export type RoomMode = '1v1' | '2v2';
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 
@@ -15,6 +17,7 @@ export interface PublicPlayer {
   nickname: string;
   side: Side;
   connectionStatus: ConnectionStatus;
+  calibrated: boolean;
 }
 
 export interface GameStatePayload {

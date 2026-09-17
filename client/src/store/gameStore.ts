@@ -12,6 +12,7 @@ export type Screen =
   | 'ONBOARDING'
   | 'LOBBY'
   | 'WAITING'
+  | 'CALIBRATING'
   | 'PLAYING'
   | 'ROUND_RESULT'
   | 'MATCH_RESULT';
@@ -43,6 +44,7 @@ interface GameStore {
   setError: (message: string | null) => void;
   applySession: (session: SessionInfo) => void;
   applyPlayers: (players: PublicPlayer[]) => void;
+  applyRoomStatus: (status: RoomStatus) => void;
   applyGameStart: () => void;
   applyGameState: (payload: GameStatePayload) => void;
   applyRoundEnd: (payload: RoundEndPayload) => void;
@@ -81,6 +83,12 @@ export const useGameStore = create<GameStore>((set) => ({
   },
 
   applyPlayers: (players) => set({ players }),
+
+  applyRoomStatus: (status) =>
+    set((state) => ({
+      status,
+      screen: status === 'CALIBRATING' ? 'CALIBRATING' : state.screen,
+    })),
 
   applyGameStart: () =>
     set({ screen: 'PLAYING', status: 'PLAYING', ropePosition: 0, opponentDisconnected: false }),

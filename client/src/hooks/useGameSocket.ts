@@ -5,12 +5,14 @@ import type {
   GameStatePayload,
   MatchEndPayload,
   PublicPlayer,
+  RoomStatus,
   RoundEndPayload,
 } from '../types';
 
 export function useGameSocket() {
   const applySession = useGameStore((s) => s.applySession);
   const applyPlayers = useGameStore((s) => s.applyPlayers);
+  const applyRoomStatus = useGameStore((s) => s.applyRoomStatus);
   const applyGameStart = useGameStore((s) => s.applyGameStart);
   const applyGameState = useGameStore((s) => s.applyGameState);
   const applyRoundEnd = useGameStore((s) => s.applyRoundEnd);
@@ -34,8 +36,9 @@ export function useGameSocket() {
       };
       setError(messages[payload.reason] ?? '방에 참가할 수 없어요.');
     }
-    function onPlayerJoined(payload: { players: PublicPlayer[] }) {
+    function onPlayerJoined(payload: { players: PublicPlayer[]; status?: RoomStatus }) {
       applyPlayers(payload.players);
+      if (payload.status) applyRoomStatus(payload.status);
       if (payload.players.length > 0 && payload.players.every((p) => p.connectionStatus === 'CONNECTED')) {
         applyOpponentDisconnected(false);
       }
@@ -100,8 +103,17 @@ export function joinRoom(code: string, nickname: string) {
   socket.emit('room:join', { code, nickname });
 }
 
-export function sendPower(roomId: string, playerId: string, motionScore: number) {
-  socket.emit('input:power', { roomId, playerId, motionScore });
+export function sendPower(
+  roomId: string,
+  playerId: string,
+  motionScore: number,
+  expressionScore = 0,
+) {
+  socket.emit('input:power', { roomId, playerId, motionScore, expressionScore });
+}
+
+export function submitCalibration(roomId: string, playerId: string, baseline: number) {
+  socket.emit('calibration:submit', { roomId, playerId, baseline });
 }
 
 export function requestRematch(roomId: string) {

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import './App.css';
 import { hasOnboarded, Tutorial } from './components/Tutorial';
+import { Calibration } from './components/Calibration';
 import { Lobby } from './components/Lobby';
 import { MatchResult } from './components/MatchResult';
 import { PlayScreen } from './components/PlayScreen';
@@ -27,6 +28,7 @@ function App() {
       {screen === 'ONBOARDING' && <Tutorial />}
       {screen === 'LOBBY' && <Lobby />}
       {screen === 'WAITING' && <WaitingRoom />}
+      {screen === 'CALIBRATING' && <Calibration />}
       {screen === 'PLAYING' && <PlayScreen />}
       {screen === 'ROUND_RESULT' && <RoundResult />}
       {screen === 'MATCH_RESULT' && <MatchResult />}

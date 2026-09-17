@@ -4,6 +4,7 @@ import {
   findRoomBySocketId,
   findRoomByPlayerId,
   joinRoom,
+  markCalibrated,
   toPublicPlayers,
 } from './roomManager.js';
 import {
@@ -21,7 +22,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     const { room, player } = createRoom(socket.id, nickname || '방장');
     socket.join(room.id);
     socket.emit('room:created', { roomId: room.id, code: room.code, playerId: player.id, side: player.side });
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room) });
+    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
   });
 
   socket.on('room:join', ({ code, nickname }: { code: string; nickname: string }) => {
@@ -33,17 +34,43 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     const { room, player } = result;
     socket.join(room.id);
     socket.emit('room:joined', { roomId: room.id, code: room.code, playerId: player.id, side: player.side });
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room) });
+    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
     tryStartMatch(io, room);
   });
 
-  socket.on('input:power', ({ roomId, playerId, motionScore }: { roomId: string; playerId: string; motionScore: number }) => {
-    const found = findRoomByPlayerId(roomId, playerId);
-    if (!found) return;
-    const { player } = found;
-    player.motionScore = Math.max(0, Math.min(1, motionScore));
-    player.lastInputAt = Date.now();
-  });
+  socket.on(
+    'input:power',
+    ({
+      roomId,
+      playerId,
+      motionScore,
+      expressionScore,
+    }: {
+      roomId: string;
+      playerId: string;
+      motionScore: number;
+      expressionScore?: number;
+    }) => {
+      const found = findRoomByPlayerId(roomId, playerId);
+      if (!found) return;
+      const { player } = found;
+      player.motionScore = Math.max(0, Math.min(1, motionScore));
+      player.expressionScore = Math.max(0, Math.min(1, expressionScore ?? 0));
+      player.lastInputAt = Date.now();
+    },
+  );
+
+  socket.on(
+    'calibration:submit',
+    ({ roomId, playerId }: { roomId: string; playerId: string; baseline: number }) => {
+      const found = findRoomByPlayerId(roomId, playerId);
+      if (!found) return;
+      const { room } = found;
+      const allDone = markCalibrated(room, playerId);
+      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+      if (allDone) tryStartMatch(io, room);
+    },
+  );
 
   socket.on('player:reconnect', ({ roomId, playerId }: { roomId: string; playerId: string }) => {
     const found = findRoomByPlayerId(roomId, playerId);
@@ -61,7 +88,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     player.connectionStatus = 'CONNECTED';
     socket.join(room.id);
 
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room) });
+    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
     socket.emit('player:reconnect', { playerId: player.id, roomId: room.id, ok: true });
 
     const opponentConnected = room.players.every((p) => p.connectionStatus === 'CONNECTED');
@@ -74,7 +101,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     const found = findRoomBySocketId(socket.id);
     if (!found || found.room.id !== roomId) return;
     backToLobby(found.room);
-    io.to(roomId).emit('room:player_joined', { players: toPublicPlayers(found.room) });
+    io.to(roomId).emit('room:player_joined', { players: toPublicPlayers(found.room), status: found.room.status });
     tryStartMatch(io, found.room);
   });
 
@@ -84,14 +111,14 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     const { room, player } = found;
     player.connectionStatus = 'DISCONNECTED';
 
-    if (room.status === 'LOBBY' || room.status === 'READY') {
+    if (room.status === 'LOBBY' || room.status === 'CALIBRATING' || room.status === 'READY') {
       room.players = room.players.filter((p) => p.id !== player.id);
       if (room.players.length === 0) {
         cleanupRoom(room.id);
         return;
       }
       room.status = 'LOBBY';
-      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room) });
+      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
       return;
     }
 
