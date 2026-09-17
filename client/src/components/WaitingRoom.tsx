@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
+import type { GameType } from '../types';
+
+const GAME_LABELS: Record<GameType, string> = {
+  tug_of_war: '줄다리기',
+  arm_wrestle: '팔씨름',
+  freeze_tag: '얼음땡',
+};
 
 export function WaitingRoom() {
   const session = useGameStore((s) => s.session);
@@ -35,7 +42,10 @@ export function WaitingRoom() {
     <section className="screen waiting">
       <h1>대기실</h1>
       <div className="card">
-        <p className="hint">친구에게 방 코드를 공유하세요 · {session.mode === '2v2' ? '2:2 팀전' : '1:1 대결'}</p>
+        <p className="hint">
+          친구에게 방 코드를 공유하세요 · {GAME_LABELS[session.gameType]} ·{' '}
+          {session.mode === '2v2' ? '2:2 팀전' : '1:1 대결'}
+        </p>
         <div className="room-code" onClick={handleCopy}>
           {session.code}
         </div>

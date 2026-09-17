@@ -91,3 +91,60 @@ export class MotionScoreTracker {
     this.smoothedScore = 0;
   }
 }
+
+/** Landmark indices sampled for whole-body movement: nose, shoulders, wrists, hips, ankles. */
+const BODY_TRACKED_INDICES = [0, 11, 12, 15, 16, 23, 24, 27, 28];
+/** Tunable: average per-frame normalized landmark displacement that counts as "moving a lot". */
+export const MAX_BODY_DELTA = 0.05;
+
+/** Whole-body movement score for 얼음땡 (freeze tag) - unlike MotionScoreTracker, not limited to arm angle. */
+export class BodyMovementTracker {
+  private previous: NormalizedLandmark[] | null = null;
+  private deltaBuffer: number[] = [];
+  private smoothedScore = 0;
+
+  update(landmarks: NormalizedLandmark[] | null): number {
+    if (!landmarks) {
+      this.previous = null;
+      return this.decay();
+    }
+
+    if (this.previous) {
+      let sum = 0;
+      let count = 0;
+      for (const i of BODY_TRACKED_INDICES) {
+        const cur = landmarks[i];
+        const prev = this.previous[i];
+        if (cur && prev) {
+          sum += Math.hypot(cur.x - prev.x, cur.y - prev.y);
+          count += 1;
+        }
+      }
+      if (count > 0) {
+        this.deltaBuffer.push(sum / count);
+        if (this.deltaBuffer.length > DELTA_WINDOW) this.deltaBuffer.shift();
+      }
+    }
+    this.previous = landmarks;
+
+    const avgDelta =
+      this.deltaBuffer.length === 0
+        ? 0
+        : this.deltaBuffer.reduce((sum, d) => sum + d, 0) / this.deltaBuffer.length;
+
+    const rawScore = Math.max(0, Math.min(1, avgDelta / MAX_BODY_DELTA));
+    this.smoothedScore += (rawScore - this.smoothedScore) * SCORE_SMOOTHING;
+    return this.smoothedScore;
+  }
+
+  private decay(): number {
+    this.smoothedScore += (0 - this.smoothedScore) * SCORE_SMOOTHING;
+    return this.smoothedScore;
+  }
+
+  reset(): void {
+    this.previous = null;
+    this.deltaBuffer = [];
+    this.smoothedScore = 0;
+  }
+}

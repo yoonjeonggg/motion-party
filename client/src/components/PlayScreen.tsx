@@ -12,10 +12,14 @@ function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
 }
 
+const GAME_LABELS = { tug_of_war: '줄다리기', arm_wrestle: '팔씨름' } as const;
+
+/** Shared play screen for the "push a position toward your side" games (tug-of-war, arm-wrestle). */
 export function PlayScreen() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
   const ropePosition = useGameStore((s) => s.ropePosition);
+  const armPosition = useGameStore((s) => s.armPosition);
   const teamPower = useGameStore((s) => s.teamPower);
   const roundNumber = useGameStore((s) => s.roundNumber);
   const roundWins = useGameStore((s) => s.roundWins);
@@ -61,13 +65,15 @@ export function PlayScreen() {
   const teammate = players.find((p) => p.side === mySide && p.id !== session.playerId);
   const opponentTeam = players.filter((p) => p.side === opponentSide);
 
-  const ropePercent = ((ropePosition + 1) / 2) * 100;
+  const position = session.gameType === 'arm_wrestle' ? armPosition : ropePosition;
+  const ropePercent = ((position + 1) / 2) * 100;
+  const gameLabel = GAME_LABELS[session.gameType as keyof typeof GAME_LABELS] ?? '';
 
   return (
     <section className="screen play">
       <div className="scoreboard">
         <span>
-          라운드 {roundNumber} · {roundWins.A} : {roundWins.B}
+          {gameLabel} · 라운드 {roundNumber} · {roundWins.A} : {roundWins.B}
         </span>
       </div>
 

@@ -1,7 +1,7 @@
 import { FaceLandmarker, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState } from 'react';
 import { ExpressionScoreTracker, rawExpressionIntensity } from '../lib/expressionScore';
-import { MotionScoreTracker } from '../lib/motionScore';
+import { BodyMovementTracker, MotionScoreTracker } from '../lib/motionScore';
 
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
 const POSE_MODEL_URL =
@@ -13,11 +13,18 @@ const FRAME_INTERVAL_MS = 1000 / 30;
 
 export type CameraState = 'IDLE' | 'REQUESTING' | 'READY' | 'DENIED' | 'ERROR';
 
+interface UseMotionCaptureOptions {
+  /** Whether to also run FaceLandmarker for expression scoring. Default true; disable for games that don't use it (perf). */
+  expression?: boolean;
+}
+
 interface UseMotionCaptureResult {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   cameraState: CameraState;
   motionScore: number;
   poseDetected: boolean;
+  /** Whole-body movement score (얼음땡), independent of the arm-specific motionScore. */
+  bodyMovementScore: number;
   expressionScore: number;
   faceDetected: boolean;
   /** Starts collecting raw expression samples for baseline calibration. */
@@ -55,10 +62,15 @@ function getFaceLandmarker(): Promise<FaceLandmarker> {
   return sharedFacePromise;
 }
 
-export function useMotionCapture(active: boolean): UseMotionCaptureResult {
+export function useMotionCapture(
+  active: boolean,
+  options: UseMotionCaptureOptions = {},
+): UseMotionCaptureResult {
+  const useExpression = options.expression ?? true;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const motionTrackerRef = useRef(new MotionScoreTracker());
+  const bodyTrackerRef = useRef(new BodyMovementTracker());
   const expressionTrackerRef = useRef(new ExpressionScoreTracker());
   const rafRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef(0);
@@ -70,6 +82,7 @@ export function useMotionCapture(active: boolean): UseMotionCaptureResult {
   const [cameraState, setCameraState] = useState<CameraState>('IDLE');
   const [motionScore, setMotionScore] = useState(0);
   const [poseDetected, setPoseDetected] = useState(false);
+  const [bodyMovementScore, setBodyMovementScore] = useState(0);
   const [expressionScore, setExpressionScore] = useState(0);
   const [faceDetected, setFaceDetected] = useState(false);
 
@@ -96,11 +109,12 @@ export function useMotionCapture(active: boolean): UseMotionCaptureResult {
 
         const [poseLandmarker, faceLandmarker] = await Promise.all([
           getPoseLandmarker(),
-          getFaceLandmarker(),
+          useExpression ? getFaceLandmarker() : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setCameraState('READY');
         motionTrackerRef.current.reset();
+        bodyTrackerRef.current.reset();
         expressionTrackerRef.current.reset();
 
         const loop = (time: number) => {
@@ -113,22 +127,25 @@ export function useMotionCapture(active: boolean): UseMotionCaptureResult {
             const landmarks = poseResult.landmarks[0] ?? null;
             const score = motionTrackerRef.current.update(landmarks);
             setMotionScore(score);
+            setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
             if (poseDetectedRef.current !== Boolean(landmarks)) {
               poseDetectedRef.current = Boolean(landmarks);
               setPoseDetected(poseDetectedRef.current);
             }
 
-            const faceResult = faceLandmarker.detectForVideo(video, now);
-            const categories = faceResult.faceBlendshapes[0]?.categories;
-            const raw = rawExpressionIntensity(categories);
-            if (faceDetectedRef.current !== (raw !== null)) {
-              faceDetectedRef.current = raw !== null;
-              setFaceDetected(faceDetectedRef.current);
-            }
-            if (calibratingRef.current) {
-              if (raw !== null) calibrationSamplesRef.current.push(raw);
-            } else {
-              setExpressionScore(expressionTrackerRef.current.update(raw));
+            if (faceLandmarker) {
+              const faceResult = faceLandmarker.detectForVideo(video, now);
+              const categories = faceResult.faceBlendshapes[0]?.categories;
+              const raw = rawExpressionIntensity(categories);
+              if (faceDetectedRef.current !== (raw !== null)) {
+                faceDetectedRef.current = raw !== null;
+                setFaceDetected(faceDetectedRef.current);
+              }
+              if (calibratingRef.current) {
+                if (raw !== null) calibrationSamplesRef.current.push(raw);
+              } else {
+                setExpressionScore(expressionTrackerRef.current.update(raw));
+              }
             }
           }
           rafRef.current = requestAnimationFrame(loop);
@@ -152,6 +169,9 @@ export function useMotionCapture(active: boolean): UseMotionCaptureResult {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
+    // useExpression is set once per mount by the caller; re-running this effect on
+    // every render of a possibly-inline options object would tear down the camera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   function beginCalibration() {
@@ -172,6 +192,7 @@ export function useMotionCapture(active: boolean): UseMotionCaptureResult {
     cameraState,
     motionScore,
     poseDetected,
+    bodyMovementScore,
     expressionScore,
     faceDetected,
     beginCalibration,

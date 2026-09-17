@@ -9,6 +9,8 @@ export type RoomStatus =
 
 export type Side = 'A' | 'B';
 export type RoomMode = '1v1' | '2v2';
+export type GameType = 'tug_of_war' | 'arm_wrestle' | 'freeze_tag';
+export type FreezeTagPhase = 'MOVE' | 'FREEZE';
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 
@@ -22,11 +24,17 @@ export interface PublicPlayer {
 
 export interface GameStatePayload {
   tick: number;
-  ropePosition: number;
-  teamPower: Record<Side, number>;
   roundNumber: number;
   roundWins: Record<Side, number>;
   status: RoomStatus;
+  teamPower?: Record<Side, number>;
+  /** tug_of_war only */
+  ropePosition?: number;
+  /** arm_wrestle only */
+  armPosition?: number;
+  /** freeze_tag only */
+  phase?: FreezeTagPhase;
+  phaseRemainingMs?: number;
 }
 
 export interface RoundEndPayload {

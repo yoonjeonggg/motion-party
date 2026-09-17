@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type {
+  FreezeTagPhase,
   GameStatePayload,
+  GameType,
   MatchEndPayload,
   PublicPlayer,
   RoomMode,
@@ -24,6 +26,7 @@ export interface SessionInfo {
   playerId: string;
   side: Side;
   mode: RoomMode;
+  gameType: GameType;
 }
 
 export interface Highlight {
@@ -38,6 +41,9 @@ interface GameStore {
   players: PublicPlayer[];
   status: RoomStatus;
   ropePosition: number;
+  armPosition: number;
+  phase: FreezeTagPhase;
+  phaseRemainingMs: number;
   teamPower: Record<Side, number>;
   roundNumber: number;
   roundWins: Record<Side, number>;
@@ -67,6 +73,9 @@ const initialGameFields = {
   players: [] as PublicPlayer[],
   status: 'LOBBY' as RoomStatus,
   ropePosition: 0,
+  armPosition: 0,
+  phase: 'MOVE' as FreezeTagPhase,
+  phaseRemainingMs: 0,
   teamPower: { A: 0, B: 0 } as Record<Side, number>,
   roundNumber: 0,
   roundWins: { A: 0, B: 0 } as Record<Side, number>,
@@ -101,16 +110,25 @@ export const useGameStore = create<GameStore>((set) => ({
     })),
 
   applyGameStart: () =>
-    set({ screen: 'PLAYING', status: 'PLAYING', ropePosition: 0, opponentDisconnected: false }),
+    set({
+      screen: 'PLAYING',
+      status: 'PLAYING',
+      ropePosition: 0,
+      armPosition: 0,
+      opponentDisconnected: false,
+    }),
 
   applyGameState: (payload) =>
-    set({
-      ropePosition: payload.ropePosition,
-      teamPower: payload.teamPower,
+    set((state) => ({
+      ropePosition: payload.ropePosition ?? state.ropePosition,
+      armPosition: payload.armPosition ?? state.armPosition,
+      phase: payload.phase ?? state.phase,
+      phaseRemainingMs: payload.phaseRemainingMs ?? state.phaseRemainingMs,
+      teamPower: payload.teamPower ?? state.teamPower,
       roundNumber: payload.roundNumber,
       roundWins: payload.roundWins,
       status: payload.status,
-    }),
+    })),
 
   applyRoundEnd: (payload) =>
     set({

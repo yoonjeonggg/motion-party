@@ -3,6 +3,7 @@ import { socket } from '../lib/socket';
 import { loadStoredSession, useGameStore } from '../store/gameStore';
 import type {
   GameStatePayload,
+  GameType,
   MatchEndPayload,
   PublicPlayer,
   RoomMode,
@@ -29,6 +30,7 @@ export function useGameSocket() {
       playerId: string;
       side: 'A' | 'B';
       mode: RoomMode;
+      gameType: GameType;
     }) {
       applySession(payload);
     }
@@ -38,6 +40,7 @@ export function useGameSocket() {
       playerId: string;
       side: 'A' | 'B';
       mode: RoomMode;
+      gameType: GameType;
     }) {
       applySession(payload);
     }
@@ -108,8 +111,8 @@ export function useGameSocket() {
   }, []);
 }
 
-export function createRoom(nickname: string, mode: RoomMode = '1v1') {
-  socket.emit('room:create', { nickname, mode });
+export function createRoom(nickname: string, mode: RoomMode = '1v1', gameType: GameType = 'tug_of_war') {
+  socket.emit('room:create', { nickname, mode, gameType });
 }
 
 export function joinRoom(code: string, nickname: string) {

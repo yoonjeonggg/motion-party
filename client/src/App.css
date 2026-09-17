@@ -269,6 +269,21 @@ button.primary {
   color: var(--accent);
 }
 
+.phase-banner {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.phase-banner.move {
+  background: color-mix(in srgb, var(--side-a) 20%, transparent);
+  color: var(--side-a);
+}
+
+.phase-banner.freeze {
+  background: color-mix(in srgb, var(--side-b) 25%, transparent);
+  color: var(--side-b);
+}
+
 .rope-track {
   position: relative;
   width: 100%;

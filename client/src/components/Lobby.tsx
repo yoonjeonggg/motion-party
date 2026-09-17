@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { createRoom, joinRoom } from '../hooks/useGameSocket';
 import { useGameStore } from '../store/gameStore';
-import type { RoomMode } from '../types';
+import type { GameType, RoomMode } from '../types';
+
+const GAME_OPTIONS: { value: GameType; label: string }[] = [
+  { value: 'tug_of_war', label: '줄다리기' },
+  { value: 'arm_wrestle', label: '팔씨름' },
+  { value: 'freeze_tag', label: '얼음땡' },
+];
 
 export function Lobby() {
   const nickname = useGameStore((s) => s.nickname);
@@ -11,10 +17,11 @@ export function Lobby() {
   const setScreen = useGameStore((s) => s.setScreen);
   const [codeInput, setCodeInput] = useState('');
   const [mode, setMode] = useState<RoomMode>('1v1');
+  const [gameType, setGameType] = useState<GameType>('tug_of_war');
 
   function handleCreate() {
     setError(null);
-    createRoom(nickname.trim() || '방장', mode);
+    createRoom(nickname.trim() || '방장', mode, gameType);
   }
 
   function handleJoin() {
@@ -41,6 +48,19 @@ export function Lobby() {
             maxLength={12}
           />
         </label>
+
+        <div className="mode-toggle">
+          {GAME_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={gameType === opt.value ? 'primary' : ''}
+              onClick={() => setGameType(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mode-toggle">
           <button

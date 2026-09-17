@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import './App.css';
 import { hasOnboarded, Tutorial } from './components/Tutorial';
 import { Calibration } from './components/Calibration';
+import { FreezeTagPlayScreen } from './components/FreezeTagPlayScreen';
 import { Lobby } from './components/Lobby';
 import { MatchResult } from './components/MatchResult';
 import { PlayScreen } from './components/PlayScreen';
@@ -15,6 +16,7 @@ function App() {
   const screen = useGameStore((s) => s.screen);
   const setScreen = useGameStore((s) => s.setScreen);
   const session = useGameStore((s) => s.session);
+  const isFreezeTag = session?.gameType === 'freeze_tag';
 
   useEffect(() => {
     if (screen === 'ONBOARDING' && !session && hasOnboarded()) {
@@ -29,7 +31,7 @@ function App() {
       {screen === 'LOBBY' && <Lobby />}
       {screen === 'WAITING' && <WaitingRoom />}
       {screen === 'CALIBRATING' && <Calibration />}
-      {screen === 'PLAYING' && <PlayScreen />}
+      {screen === 'PLAYING' && (isFreezeTag ? <FreezeTagPlayScreen /> : <PlayScreen />)}
       {screen === 'ROUND_RESULT' && <RoundResult />}
       {screen === 'MATCH_RESULT' && <MatchResult />}
     </main>
