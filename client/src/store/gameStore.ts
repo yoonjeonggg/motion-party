@@ -3,6 +3,7 @@ import type {
   GameStatePayload,
   MatchEndPayload,
   PublicPlayer,
+  RoomMode,
   RoundEndPayload,
   RoomStatus,
   Side,
@@ -22,6 +23,7 @@ export interface SessionInfo {
   code: string;
   playerId: string;
   side: Side;
+  mode: RoomMode;
 }
 
 interface GameStore {

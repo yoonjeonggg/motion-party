@@ -5,6 +5,7 @@ import type {
   GameStatePayload,
   MatchEndPayload,
   PublicPlayer,
+  RoomMode,
   RoomStatus,
   RoundEndPayload,
 } from '../types';
@@ -22,10 +23,22 @@ export function useGameSocket() {
   const leaveRoom = useGameStore((s) => s.leaveRoom);
 
   useEffect(() => {
-    function onCreated(payload: { roomId: string; code: string; playerId: string; side: 'A' | 'B' }) {
+    function onCreated(payload: {
+      roomId: string;
+      code: string;
+      playerId: string;
+      side: 'A' | 'B';
+      mode: RoomMode;
+    }) {
       applySession(payload);
     }
-    function onJoined(payload: { roomId: string; code: string; playerId: string; side: 'A' | 'B' }) {
+    function onJoined(payload: {
+      roomId: string;
+      code: string;
+      playerId: string;
+      side: 'A' | 'B';
+      mode: RoomMode;
+    }) {
       applySession(payload);
     }
     function onJoinError(payload: { reason: string }) {
@@ -95,8 +108,8 @@ export function useGameSocket() {
   }, []);
 }
 
-export function createRoom(nickname: string) {
-  socket.emit('room:create', { nickname });
+export function createRoom(nickname: string, mode: RoomMode = '1v1') {
+  socket.emit('room:create', { nickname, mode });
 }
 
 export function joinRoom(code: string, nickname: string) {

@@ -38,8 +38,9 @@ export function PlayScreen() {
 
   const mySide = session.side;
   const opponentSide = opposite(mySide);
-  const me = players.find((p) => p.side === mySide);
-  const opponent = players.find((p) => p.side === opponentSide);
+  const me = players.find((p) => p.id === session.playerId);
+  const teammate = players.find((p) => p.side === mySide && p.id !== session.playerId);
+  const opponentTeam = players.filter((p) => p.side === opponentSide);
 
   const ropePercent = ((ropePosition + 1) / 2) * 100;
 
@@ -65,7 +66,9 @@ export function PlayScreen() {
       <div className="players-row">
         <div className="player-panel">
           <video ref={videoRef} className="preview mirrored small" muted playsInline />
-          <p className="player-name">{me?.nickname ?? '나'} (나)</p>
+          <p className="player-name">
+            {me?.nickname ?? '나'} (나){teammate && ` · ${teammate.nickname}`}
+          </p>
           {!poseDetected && <p className="hint small">카메라 각도를 조정해주세요</p>}
           <div className="gauge">
             <div
@@ -81,8 +84,10 @@ export function PlayScreen() {
         <div className="vs">VS</div>
 
         <div className="player-panel">
-          <div className="preview small placeholder">{opponent?.nickname?.[0] ?? '?'}</div>
-          <p className="player-name">{opponent?.nickname ?? '상대'}</p>
+          <div className="preview small placeholder">{opponentTeam[0]?.nickname?.[0] ?? '?'}</div>
+          <p className="player-name">
+            {opponentTeam.length > 0 ? opponentTeam.map((p) => p.nickname).join(' · ') : '상대'}
+          </p>
           <div className="gauge">
             <div
               className="gauge-fill opponent"

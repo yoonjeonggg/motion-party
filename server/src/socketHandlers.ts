@@ -15,13 +15,19 @@ import {
   resumeAfterReconnect,
   tryStartMatch,
 } from './gameLoop.js';
-import { RECONNECT_GRACE_MS, type Room, type Side } from './types.js';
+import { RECONNECT_GRACE_MS, type Player, type Room, type RoomMode } from './types.js';
 
 export function registerSocketHandlers(io: Server, socket: Socket): void {
-  socket.on('room:create', ({ nickname }: { nickname: string }) => {
-    const { room, player } = createRoom(socket.id, nickname || '방장');
+  socket.on('room:create', ({ nickname, mode }: { nickname: string; mode?: RoomMode }) => {
+    const { room, player } = createRoom(socket.id, nickname || '방장', mode ?? '1v1');
     socket.join(room.id);
-    socket.emit('room:created', { roomId: room.id, code: room.code, playerId: player.id, side: player.side });
+    socket.emit('room:created', {
+      roomId: room.id,
+      code: room.code,
+      playerId: player.id,
+      side: player.side,
+      mode: room.mode,
+    });
     io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
   });
 
@@ -33,7 +39,13 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     }
     const { room, player } = result;
     socket.join(room.id);
-    socket.emit('room:joined', { roomId: room.id, code: room.code, playerId: player.id, side: player.side });
+    socket.emit('room:joined', {
+      roomId: room.id,
+      code: room.code,
+      playerId: player.id,
+      side: player.side,
+      mode: room.mode,
+    });
     io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
     tryStartMatch(io, room);
   });
@@ -79,10 +91,10 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
       return;
     }
     const { room, player } = found;
-    const timer = room.disconnectTimers[player.side];
+    const timer = room.disconnectTimers[player.id];
     if (timer) {
       clearTimeout(timer);
-      delete room.disconnectTimers[player.side];
+      delete room.disconnectTimers[player.id];
     }
     player.socketId = socket.id;
     player.connectionStatus = 'CONNECTED';
@@ -125,15 +137,15 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     io.to(room.id).emit('player:disconnect', { playerId: player.id, side: player.side });
     pauseForDisconnect(room);
 
-    room.disconnectTimers[player.side] = setTimeout(() => {
-      handleGraceExpired(io, room, player.side);
+    room.disconnectTimers[player.id] = setTimeout(() => {
+      handleGraceExpired(io, room, player);
     }, RECONNECT_GRACE_MS);
   });
 }
 
-function handleGraceExpired(io: Server, room: Room, disconnectedSide: Side): void {
+function handleGraceExpired(io: Server, room: Room, disconnectedPlayer: Player): void {
   if (room.status !== 'PAUSED') return;
-  const player = room.players.find((p) => p.side === disconnectedSide);
-  if (player?.connectionStatus === 'CONNECTED') return;
-  forfeitToRemainingPlayer(io, room, disconnectedSide);
+  const player = room.players.find((p) => p.id === disconnectedPlayer.id);
+  if (!player || player.connectionStatus === 'CONNECTED') return;
+  forfeitToRemainingPlayer(io, room, player.side);
 }

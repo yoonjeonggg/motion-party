@@ -26,27 +26,45 @@ export function WaitingRoom() {
     leaveRoom();
   }
 
-  const full = players.length >= 2;
+  const capacity = session.mode === '2v2' ? 4 : 2;
+  const full = players.length >= capacity;
+  const teamA = players.filter((p) => p.side === 'A');
+  const teamB = players.filter((p) => p.side === 'B');
 
   return (
     <section className="screen waiting">
       <h1>대기실</h1>
       <div className="card">
-        <p className="hint">친구에게 방 코드를 공유하세요</p>
+        <p className="hint">친구에게 방 코드를 공유하세요 · {session.mode === '2v2' ? '2:2 팀전' : '1:1 대결'}</p>
         <div className="room-code" onClick={handleCopy}>
           {session.code}
         </div>
         {copied && <p className="feedback">복사되었어요!</p>}
 
-        <ul className="player-list">
-          {players.map((p) => (
-            <li key={p.id}>
-              <span className={`badge side-${p.side}`}>{p.side}</span>
-              {p.nickname}
-              {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
-            </li>
-          ))}
-        </ul>
+        <p className="hint">
+          {players.length}/{capacity}명
+        </p>
+
+        <div className="team-columns">
+          <ul className="player-list">
+            {teamA.map((p) => (
+              <li key={p.id}>
+                <span className="badge side-A">A</span>
+                {p.nickname}
+                {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
+              </li>
+            ))}
+          </ul>
+          <ul className="player-list">
+            {teamB.map((p) => (
+              <li key={p.id}>
+                <span className="badge side-B">B</span>
+                {p.nickname}
+                {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {!full && <p className="hint">상대방을 기다리는 중...</p>}
         {full && <p className="feedback">양쪽 준비 완료! 곧 시작해요...</p>}

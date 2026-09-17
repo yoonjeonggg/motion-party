@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createRoom, joinRoom } from '../hooks/useGameSocket';
 import { useGameStore } from '../store/gameStore';
+import type { RoomMode } from '../types';
 
 export function Lobby() {
   const nickname = useGameStore((s) => s.nickname);
@@ -9,10 +10,11 @@ export function Lobby() {
   const setError = useGameStore((s) => s.setError);
   const setScreen = useGameStore((s) => s.setScreen);
   const [codeInput, setCodeInput] = useState('');
+  const [mode, setMode] = useState<RoomMode>('1v1');
 
   function handleCreate() {
     setError(null);
-    createRoom(nickname.trim() || '방장');
+    createRoom(nickname.trim() || '방장', mode);
   }
 
   function handleJoin() {
@@ -39,6 +41,23 @@ export function Lobby() {
             maxLength={12}
           />
         </label>
+
+        <div className="mode-toggle">
+          <button
+            type="button"
+            className={mode === '1v1' ? 'primary' : ''}
+            onClick={() => setMode('1v1')}
+          >
+            1:1
+          </button>
+          <button
+            type="button"
+            className={mode === '2v2' ? 'primary' : ''}
+            onClick={() => setMode('2v2')}
+          >
+            2:2
+          </button>
+        </div>
 
         <button type="button" className="primary" onClick={handleCreate}>
           방 만들기

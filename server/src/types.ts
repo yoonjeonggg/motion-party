@@ -8,6 +8,7 @@ export type RoomStatus =
   | 'MATCH_RESULT';
 
 export type Side = 'A' | 'B';
+export type RoomMode = '1v1' | '2v2';
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 
@@ -32,7 +33,7 @@ export interface Room {
   id: string;
   code: string;
   status: RoomStatus;
-  mode: '1v1';
+  mode: RoomMode;
   players: Player[];
   createdAt: number;
   roundNumber: number;
@@ -42,7 +43,17 @@ export interface Room {
   roundPower: Record<Side, number>;
   loopHandle: ReturnType<typeof setInterval> | null;
   roundResultTimeout: ReturnType<typeof setTimeout> | null;
-  disconnectTimers: Partial<Record<Side, ReturnType<typeof setTimeout>>>;
+  /** Keyed by player id, so 2v2 teammates can each carry their own reconnect grace timer. */
+  disconnectTimers: Partial<Record<string, ReturnType<typeof setTimeout>>>;
+}
+
+/** Players allowed on one side for a given mode. */
+export function perSideCapacity(mode: RoomMode): number {
+  return mode === '2v2' ? 2 : 1;
+}
+
+export function roomCapacity(mode: RoomMode): number {
+  return perSideCapacity(mode) * 2;
 }
 
 export interface PublicPlayer {
@@ -60,4 +71,5 @@ export const RECONNECT_GRACE_MS = 30_000;
 export const ROPE_LIMIT = 1;
 export const ROPE_SPEED = 0.35;
 export const WINS_NEEDED = 2;
-export const MAX_PLAYERS = 2;
+/** Tunable: max multiplicative bonus (e.g. 0.3 = +30%) when 2v2 teammates' power is perfectly in sync. */
+export const SYNC_MAX_BONUS = 0.3;

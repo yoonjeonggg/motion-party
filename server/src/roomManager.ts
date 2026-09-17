@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { MAX_PLAYERS, type Player, type PublicPlayer, type Room, type Side } from './types.js';
+import {
+  perSideCapacity,
+  roomCapacity,
+  type Player,
+  type PublicPlayer,
+  type Room,
+  type RoomMode,
+  type Side,
+} from './types.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
@@ -17,7 +25,11 @@ function generateCode(): string {
   return code;
 }
 
-export function createRoom(hostSocketId: string, nickname: string): { room: Room; player: Player } {
+export function createRoom(
+  hostSocketId: string,
+  nickname: string,
+  mode: RoomMode = '1v1',
+): { room: Room; player: Player } {
   const player: Player = {
     id: randomUUID(),
     socketId: hostSocketId,
@@ -34,7 +46,7 @@ export function createRoom(hostSocketId: string, nickname: string): { room: Room
     id: randomUUID(),
     code: generateCode(),
     status: 'LOBBY',
-    mode: '1v1',
+    mode,
     players: [player],
     createdAt: Date.now(),
     roundNumber: 0,
@@ -62,10 +74,15 @@ export function joinRoom(code: string, socketId: string, nickname: string): Join
   const room = rooms.get(roomId);
   if (!room) return { ok: false, reason: 'NOT_FOUND' };
   if (room.status !== 'LOBBY') return { ok: false, reason: 'ALREADY_STARTED' };
-  if (room.players.length >= MAX_PLAYERS) return { ok: false, reason: 'FULL' };
+  if (room.players.length >= roomCapacity(room.mode)) return { ok: false, reason: 'FULL' };
 
-  const usedSides = new Set(room.players.map((p) => p.side));
-  const side: Side = usedSides.has('A') ? 'B' : 'A';
+  const cap = perSideCapacity(room.mode);
+  const countA = room.players.filter((p) => p.side === 'A').length;
+  const countB = room.players.filter((p) => p.side === 'B').length;
+  const canA = countA < cap;
+  const canB = countB < cap;
+  if (!canA && !canB) return { ok: false, reason: 'FULL' };
+  const side: Side = canA && (!canB || countA <= countB) ? 'A' : 'B';
 
   const player: Player = {
     id: randomUUID(),
@@ -80,7 +97,7 @@ export function joinRoom(code: string, socketId: string, nickname: string): Join
   };
 
   room.players.push(player);
-  if (room.players.length === MAX_PLAYERS) {
+  if (room.players.length === roomCapacity(room.mode)) {
     room.status = 'CALIBRATING';
   }
 
@@ -92,7 +109,8 @@ export function markCalibrated(room: Room, playerId: string): boolean {
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return false;
   player.calibrated = true;
-  const allDone = room.players.length >= MAX_PLAYERS && room.players.every((p) => p.calibrated);
+  const allDone =
+    room.players.length >= roomCapacity(room.mode) && room.players.every((p) => p.calibrated);
   if (allDone) room.status = 'READY';
   return allDone;
 }
@@ -147,7 +165,7 @@ export function resetRoomToLobby(room: Room): void {
     player.calibrated = false;
     player.expressionScore = 0;
   }
-  room.status = room.players.length >= MAX_PLAYERS ? 'CALIBRATING' : 'LOBBY';
+  room.status = room.players.length >= roomCapacity(room.mode) ? 'CALIBRATING' : 'LOBBY';
   room.roundNumber = 0;
   room.roundWins = { A: 0, B: 0 };
   room.ropePosition = 0;

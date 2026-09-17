@@ -1,10 +1,12 @@
 import type { Server } from 'socket.io';
 import {
   effectivePower,
+  roomCapacity,
   ROPE_LIMIT,
   ROPE_SPEED,
   ROUND_RESULT_DELAY_MS,
   ROUND_TIME_LIMIT_MS,
+  SYNC_MAX_BONUS,
   TICK_RATE_MS,
   WINS_NEEDED,
   type Room,
@@ -16,13 +18,23 @@ function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
 }
 
-function playerBySide(room: Room, side: Side) {
-  return room.players.find((p) => p.side === side);
+function playersBySide(room: Room, side: Side) {
+  return room.players.filter((p) => p.side === side);
 }
 
+/**
+ * Combined power for a side. In 2v2, teammates whose power is closely in sync
+ * (per FN-10) get a multiplicative bonus on top of their summed power.
+ */
 function sidePower(room: Room, side: Side): number {
-  const player = playerBySide(room, side);
-  return player ? effectivePower(player) : 0;
+  const powers = playersBySide(room, side).map(effectivePower);
+  if (powers.length === 0) return 0;
+  const sum = powers.reduce((a, b) => a + b, 0);
+  const [p1, p2] = powers;
+  if (p1 === undefined || p2 === undefined) return sum;
+  const diff = Math.abs(p1 - p2);
+  const syncBonus = 1 + SYNC_MAX_BONUS * Math.max(0, 1 - diff);
+  return sum * syncBonus;
 }
 
 function broadcastState(io: Server, room: Room): void {
@@ -141,7 +153,7 @@ function tick(io: Server, room: Room): void {
 }
 
 export function tryStartMatch(io: Server, room: Room): void {
-  if (room.status === 'READY' && room.players.length >= 2) {
+  if (room.status === 'READY' && room.players.length >= roomCapacity(room.mode)) {
     startRound(io, room);
   }
 }

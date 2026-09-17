@@ -110,6 +110,15 @@ button.primary {
   justify-content: center;
 }
 
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-toggle button {
+  flex: 1;
+}
+
 .preview {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -188,6 +197,16 @@ button.primary {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.team-columns {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+.team-columns .player-list {
+  flex: 1;
 }
 
 .player-list li {

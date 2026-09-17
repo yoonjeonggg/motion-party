@@ -11,7 +11,8 @@ export function MatchResult() {
 
   if (!matchEnd || !session) return null;
 
-  const winner = players.find((p) => p.side === matchEnd.winner);
+  const winners = players.filter((p) => p.side === matchEnd.winner);
+  const winnerLabel = winners.length > 0 ? winners.map((p) => p.nickname).join(' · ') : matchEnd.winner;
 
   function handleRematch() {
     requestRematch(session!.roomId);
@@ -28,7 +29,7 @@ export function MatchResult() {
     <section className="screen match-result">
       <h1>매치 종료</h1>
       <div className="card">
-        <p className="feedback big">🏆 {winner?.nickname ?? matchEnd.winner} 승리!</p>
+        <p className="feedback big">🏆 {winnerLabel} 승리!</p>
         <p className="sub">
           최종 스코어 {matchEnd.finalScores.A} : {matchEnd.finalScores.B}
         </p>
