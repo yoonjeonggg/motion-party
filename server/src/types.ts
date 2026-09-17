@@ -10,6 +10,10 @@ export type RoomStatus =
 export type Side = 'A' | 'B';
 export type RoomMode = '1v1' | '2v2';
 
+export function opposite(side: Side): Side {
+  return side === 'A' ? 'B' : 'A';
+}
+
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
 
 export interface Player {
@@ -41,13 +45,8 @@ export interface Room {
   roundNumber: number;
   roundWins: Record<Side, number>;
   roundStartedAt: number;
-  /**
-   * Tug-of-war specific round state. A future minigame with different state
-   * (e.g. freeze-tag positions) would add its own field here rather than
-   * reuse these - the FN-12 abstraction only covers tick/round-outcome logic.
-   */
-  ropePosition: number;
-  roundPower: Record<Side, number>;
+  /** Opaque per-round state owned and shaped by the active MiniGameModule (see FN-12). */
+  gameState: unknown;
   loopHandle: ReturnType<typeof setInterval> | null;
   roundResultTimeout: ReturnType<typeof setTimeout> | null;
   /** Keyed by player id, so 2v2 teammates can each carry their own reconnect grace timer. */
@@ -77,6 +76,17 @@ export const ROUND_RESULT_DELAY_MS = 3_000;
 export const RECONNECT_GRACE_MS = 30_000;
 export const ROPE_LIMIT = 1;
 export const ROPE_SPEED = 0.35;
+/** Arm-wrestling resolves faster than tug-of-war: shorter reach, quicker push, shorter time limit. */
+export const ARM_WRESTLE_LIMIT = 1;
+export const ARM_WRESTLE_SPEED = 0.5;
+export const ARM_WRESTLE_TIME_LIMIT_MS = 20_000;
 export const WINS_NEEDED = 2;
 /** Tunable: max multiplicative bonus (e.g. 0.3 = +30%) when 2v2 teammates' power is perfectly in sync. */
 export const SYNC_MAX_BONUS = 0.3;
+
+// 얼음땡 (freeze tag)
+export const FREEZE_TAG_MOVE_PHASE_MS = 4_000;
+export const FREEZE_TAG_FREEZE_PHASE_MS = 2_500;
+export const FREEZE_TAG_TIME_LIMIT_MS = 30_000;
+/** A side is "caught" if any of its players' body-movement score exceeds this during FREEZE. */
+export const FREEZE_TAG_MOVE_THRESHOLD = 0.12;

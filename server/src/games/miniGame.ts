@@ -11,6 +11,8 @@ export interface TickResult {
  */
 export interface MiniGameModule {
   readonly id: string;
+  /** Whether this game uses FN-08 expression scoring (and therefore needs FN-09 calibration). */
+  readonly usesExpression: boolean;
   /** Reset per-round state when a new round starts. */
   resetRound(room: Room): void;
   /** Advance one tick, mutating room state. Returns whether the round just ended. */

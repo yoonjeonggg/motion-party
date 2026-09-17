@@ -15,21 +15,26 @@ import {
   resumeAfterReconnect,
   tryStartMatch,
 } from './gameLoop.js';
+import { DEFAULT_GAME_TYPE } from './games/registry.js';
 import { RECONNECT_GRACE_MS, type Player, type Room, type RoomMode } from './types.js';
 
 export function registerSocketHandlers(io: Server, socket: Socket): void {
-  socket.on('room:create', ({ nickname, mode }: { nickname: string; mode?: RoomMode }) => {
-    const { room, player } = createRoom(socket.id, nickname || '방장', mode ?? '1v1');
-    socket.join(room.id);
-    socket.emit('room:created', {
-      roomId: room.id,
-      code: room.code,
-      playerId: player.id,
-      side: player.side,
-      mode: room.mode,
-    });
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
-  });
+  socket.on(
+    'room:create',
+    ({ nickname, mode, gameType }: { nickname: string; mode?: RoomMode; gameType?: string }) => {
+      const { room, player } = createRoom(socket.id, nickname || '방장', mode ?? '1v1', gameType ?? DEFAULT_GAME_TYPE);
+      socket.join(room.id);
+      socket.emit('room:created', {
+        roomId: room.id,
+        code: room.code,
+        playerId: player.id,
+        side: player.side,
+        mode: room.mode,
+        gameType: room.gameType,
+      });
+      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+    },
+  );
 
   socket.on('room:join', ({ code, nickname }: { code: string; nickname: string }) => {
     const result = joinRoom(code, socket.id, nickname || '참가자');
@@ -45,6 +50,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
       playerId: player.id,
       side: player.side,
       mode: room.mode,
+      gameType: room.gameType,
     });
     io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
     tryStartMatch(io, room);

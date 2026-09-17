@@ -8,7 +8,7 @@ import {
   type RoomMode,
   type Side,
 } from './types.js';
-import { DEFAULT_GAME_TYPE } from './games/registry.js';
+import { DEFAULT_GAME_TYPE, getMiniGame } from './games/registry.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
@@ -54,9 +54,8 @@ export function createRoom(
     createdAt: Date.now(),
     roundNumber: 0,
     roundWins: { A: 0, B: 0 },
-    ropePosition: 0,
     roundStartedAt: 0,
-    roundPower: { A: 0, B: 0 },
+    gameState: null,
     loopHandle: null,
     roundResultTimeout: null,
     disconnectTimers: {},
@@ -101,7 +100,7 @@ export function joinRoom(code: string, socketId: string, nickname: string): Join
 
   room.players.push(player);
   if (room.players.length === roomCapacity(room.mode)) {
-    room.status = 'CALIBRATING';
+    room.status = getMiniGame(room.gameType).usesExpression ? 'CALIBRATING' : 'READY';
   }
 
   return { ok: true, room, player };
@@ -168,8 +167,8 @@ export function resetRoomToLobby(room: Room): void {
     player.calibrated = false;
     player.expressionScore = 0;
   }
-  room.status = room.players.length >= roomCapacity(room.mode) ? 'CALIBRATING' : 'LOBBY';
+  const full = room.players.length >= roomCapacity(room.mode);
+  room.status = full ? (getMiniGame(room.gameType).usesExpression ? 'CALIBRATING' : 'READY') : 'LOBBY';
   room.roundNumber = 0;
   room.roundWins = { A: 0, B: 0 };
-  room.ropePosition = 0;
 }

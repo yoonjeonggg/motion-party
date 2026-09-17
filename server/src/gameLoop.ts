@@ -1,5 +1,6 @@
 import type { Server } from 'socket.io';
 import {
+  opposite,
   roomCapacity,
   ROUND_RESULT_DELAY_MS,
   ROUND_TIME_LIMIT_MS,
@@ -10,10 +11,6 @@ import {
 } from './types.js';
 import { destroyRoom, resetRoomToLobby } from './roomManager.js';
 import { getMiniGame } from './games/registry.js';
-
-function opposite(side: Side): Side {
-  return side === 'A' ? 'B' : 'A';
-}
 
 function broadcastState(io: Server, room: Room): void {
   io.to(room.id).emit('game:state', {
