@@ -6,6 +6,7 @@ export function MatchResult() {
   const matchEnd = useGameStore((s) => s.matchEnd);
   const players = useGameStore((s) => s.players);
   const session = useGameStore((s) => s.session);
+  const highlight = useGameStore((s) => s.highlight);
   const resetMatch = useGameStore((s) => s.resetMatch);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
 
@@ -36,6 +37,17 @@ export function MatchResult() {
         {matchEnd.reason === 'DISCONNECT' && (
           <p className="hint">상대방이 재접속하지 못해 자동 승리 처리되었어요.</p>
         )}
+
+        {highlight && (
+          <div className="highlight-card">
+            <p className="hint">가장 힘든 표정이었던 순간이에요!</p>
+            <img src={highlight.dataUrl} alt="하이라이트" className="highlight-image" />
+            <a href={highlight.dataUrl} download="motionparty-highlight.jpg">
+              <button type="button">하이라이트 다운로드</button>
+            </a>
+          </div>
+        )}
+
         <div className="button-row">
           <button type="button" className="primary" onClick={handleRematch}>
             다시하기

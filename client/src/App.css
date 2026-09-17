@@ -119,6 +119,20 @@ button.primary {
   flex: 1;
 }
 
+.highlight-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.highlight-image {
+  width: 100%;
+  max-width: 240px;
+  border-radius: 12px;
+  transform: scaleX(-1);
+}
+
 .preview {
   width: 100%;
   aspect-ratio: 4 / 3;

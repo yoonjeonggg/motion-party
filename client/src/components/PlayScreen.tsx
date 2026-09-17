@@ -5,6 +5,8 @@ import { useGameStore } from '../store/gameStore';
 import type { Side } from '../types';
 
 const SEND_INTERVAL_MS = 60;
+/** Tunable: minimum expression score before a frame is worth capturing as a highlight. */
+const HIGHLIGHT_MIN_SCORE = 0.3;
 
 function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
@@ -19,12 +21,14 @@ export function PlayScreen() {
   const roundWins = useGameStore((s) => s.roundWins);
   const status = useGameStore((s) => s.status);
   const opponentDisconnected = useGameStore((s) => s.opponentDisconnected);
+  const updateHighlight = useGameStore((s) => s.updateHighlight);
 
   const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true);
   const scoreRef = useRef(0);
   scoreRef.current = motionScore;
   const expressionRef = useRef(0);
   expressionRef.current = expressionScore;
+  const bestLocalHighlightRef = useRef(0);
 
   useEffect(() => {
     if (!session) return;
@@ -33,6 +37,21 @@ export function PlayScreen() {
     }, SEND_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [session]);
+
+  useEffect(() => {
+    if (expressionScore < HIGHLIGHT_MIN_SCORE || expressionScore <= bestLocalHighlightRef.current) return;
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return;
+    bestLocalHighlightRef.current = expressionScore;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    updateHighlight(expressionScore, canvas.toDataURL('image/jpeg', 0.85));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expressionScore]);
 
   if (!session) return null;
 

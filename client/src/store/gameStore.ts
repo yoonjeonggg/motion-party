@@ -26,6 +26,11 @@ export interface SessionInfo {
   mode: RoomMode;
 }
 
+export interface Highlight {
+  score: number;
+  dataUrl: string;
+}
+
 interface GameStore {
   screen: Screen;
   nickname: string;
@@ -40,6 +45,7 @@ interface GameStore {
   matchEnd: MatchEndPayload | null;
   error: string | null;
   opponentDisconnected: boolean;
+  highlight: Highlight | null;
 
   setNickname: (nickname: string) => void;
   setScreen: (screen: Screen) => void;
@@ -52,6 +58,7 @@ interface GameStore {
   applyRoundEnd: (payload: RoundEndPayload) => void;
   applyMatchEnd: (payload: MatchEndPayload) => void;
   applyOpponentDisconnected: (disconnected: boolean) => void;
+  updateHighlight: (score: number, dataUrl: string) => void;
   resetMatch: () => void;
   leaveRoom: () => void;
 }
@@ -66,6 +73,7 @@ const initialGameFields = {
   lastRoundEnd: null,
   matchEnd: null,
   opponentDisconnected: false,
+  highlight: null as Highlight | null,
 };
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -116,6 +124,9 @@ export const useGameStore = create<GameStore>((set) => ({
     set({ screen: 'MATCH_RESULT', status: 'MATCH_RESULT', matchEnd: payload }),
 
   applyOpponentDisconnected: (disconnected) => set({ opponentDisconnected: disconnected }),
+
+  updateHighlight: (score, dataUrl) =>
+    set((state) => (!state.highlight || score > state.highlight.score ? { highlight: { score, dataUrl } } : {})),
 
   resetMatch: () => set({ ...initialGameFields, screen: 'WAITING' }),
 
