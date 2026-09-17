@@ -11,6 +11,7 @@ import {
 } from './types.js';
 import { destroyRoom, resetRoomToLobby } from './roomManager.js';
 import { getMiniGame } from './games/registry.js';
+import { logger } from './logger.js';
 
 function broadcastState(io: Server, room: Room): void {
   io.to(room.id).emit('game:state', {
@@ -22,11 +23,25 @@ function broadcastState(io: Server, room: Room): void {
   });
 }
 
+/** Starts (or restarts) the tick interval, guarding each tick so one bad frame doesn't kill the room's loop. */
+function startTickLoop(io: Server, room: Room): void {
+  if (room.loopHandle) clearInterval(room.loopHandle);
+  room.loopHandle = setInterval(() => {
+    try {
+      tick(io, room);
+    } catch (err) {
+      logger.error({ roomId: room.id, gameType: room.gameType, err }, 'tick error');
+    }
+  }, TICK_RATE_MS);
+}
+
 function startRound(io: Server, room: Room): void {
   room.roundNumber += 1;
   room.roundStartedAt = Date.now();
   room.status = 'PLAYING';
   getMiniGame(room.gameType).resetRound(room);
+
+  logger.info({ roomId: room.id, gameType: room.gameType, roundNumber: room.roundNumber }, 'round started');
 
   io.to(room.id).emit('game:start', {
     roomId: room.id,
@@ -34,8 +49,7 @@ function startRound(io: Server, room: Room): void {
     roundNumber: room.roundNumber,
   });
 
-  if (room.loopHandle) clearInterval(room.loopHandle);
-  room.loopHandle = setInterval(() => tick(io, room), TICK_RATE_MS);
+  startTickLoop(io, room);
 }
 
 function endRound(io: Server, room: Room, winner: Side): void {
@@ -45,6 +59,11 @@ function endRound(io: Server, room: Room, winner: Side): void {
   }
   room.roundWins[winner] += 1;
   room.status = 'ROUND_RESULT';
+
+  logger.info(
+    { roomId: room.id, winner, roundNumber: room.roundNumber, scores: room.roundWins },
+    'round ended',
+  );
 
   io.to(room.id).emit('game:round_end', {
     winner,
@@ -79,6 +98,8 @@ export function endMatch(
     room.roundResultTimeout = null;
   }
   room.status = 'MATCH_RESULT';
+
+  logger.info({ roomId: room.id, winner, reason, finalScores: room.roundWins }, 'match ended');
 
   io.to(room.id).emit('game:match_end', {
     winner,
@@ -117,7 +138,8 @@ export function pauseForDisconnect(room: Room): void {
 export function resumeAfterReconnect(io: Server, room: Room): void {
   room.status = 'PLAYING';
   room.roundStartedAt = Date.now() - Math.min(Date.now() - room.roundStartedAt, ROUND_TIME_LIMIT_MS);
-  room.loopHandle = setInterval(() => tick(io, room), TICK_RATE_MS);
+  logger.info({ roomId: room.id }, 'match resumed after reconnect');
+  startTickLoop(io, room);
 }
 
 export function forfeitToRemainingPlayer(io: Server, room: Room, disconnectedSide: Side): void {
