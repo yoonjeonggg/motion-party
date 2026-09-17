@@ -310,3 +310,42 @@ button.primary {
   color: var(--text);
   padding-top: 60px;
 }
+
+.screen.tutorial {
+  position: relative;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.5;
+}
+
+.skip-link:hover {
+  opacity: 0.8;
+  border-color: transparent;
+}
+
+.skip-link.prominent {
+  position: static;
+  align-self: flex-end;
+  opacity: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}

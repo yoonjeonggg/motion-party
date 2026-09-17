@@ -7,6 +7,7 @@ export function Lobby() {
   const setNickname = useGameStore((s) => s.setNickname);
   const error = useGameStore((s) => s.error);
   const setError = useGameStore((s) => s.setError);
+  const setScreen = useGameStore((s) => s.setScreen);
   const [codeInput, setCodeInput] = useState('');
 
   function handleCreate() {
@@ -60,6 +61,10 @@ export function Lobby() {
 
         {error && <p className="error-text">{error}</p>}
       </div>
+
+      <button type="button" className="ghost" onClick={() => setScreen('ONBOARDING')}>
+        튜토리얼 다시보기
+      </button>
     </section>
   );
 }

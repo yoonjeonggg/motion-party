@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import './App.css';
-import { hasOnboarded, Onboarding } from './components/Onboarding';
+import { hasOnboarded, Tutorial } from './components/Tutorial';
 import { Lobby } from './components/Lobby';
 import { MatchResult } from './components/MatchResult';
 import { PlayScreen } from './components/PlayScreen';
@@ -24,7 +24,7 @@ function App() {
 
   return (
     <main className="app-root">
-      {screen === 'ONBOARDING' && <Onboarding />}
+      {screen === 'ONBOARDING' && <Tutorial />}
       {screen === 'LOBBY' && <Lobby />}
       {screen === 'WAITING' && <WaitingRoom />}
       {screen === 'PLAYING' && <PlayScreen />}
