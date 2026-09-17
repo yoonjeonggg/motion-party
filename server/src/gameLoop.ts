@@ -1,50 +1,24 @@
 import type { Server } from 'socket.io';
 import {
-  effectivePower,
   roomCapacity,
-  ROPE_LIMIT,
-  ROPE_SPEED,
   ROUND_RESULT_DELAY_MS,
   ROUND_TIME_LIMIT_MS,
-  SYNC_MAX_BONUS,
   TICK_RATE_MS,
   WINS_NEEDED,
   type Room,
   type Side,
 } from './types.js';
 import { destroyRoom, resetRoomToLobby } from './roomManager.js';
+import { getMiniGame } from './games/registry.js';
 
 function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
 }
 
-function playersBySide(room: Room, side: Side) {
-  return room.players.filter((p) => p.side === side);
-}
-
-/**
- * Combined power for a side. In 2v2, teammates whose power is closely in sync
- * (per FN-10) get a multiplicative bonus on top of their summed power.
- */
-function sidePower(room: Room, side: Side): number {
-  const powers = playersBySide(room, side).map(effectivePower);
-  if (powers.length === 0) return 0;
-  const sum = powers.reduce((a, b) => a + b, 0);
-  const [p1, p2] = powers;
-  if (p1 === undefined || p2 === undefined) return sum;
-  const diff = Math.abs(p1 - p2);
-  const syncBonus = 1 + SYNC_MAX_BONUS * Math.max(0, 1 - diff);
-  return sum * syncBonus;
-}
-
 function broadcastState(io: Server, room: Room): void {
   io.to(room.id).emit('game:state', {
     tick: Date.now(),
-    ropePosition: room.ropePosition,
-    teamPower: {
-      A: sidePower(room, 'A'),
-      B: sidePower(room, 'B'),
-    },
+    ...getMiniGame(room.gameType).broadcastPayload(room),
     roundNumber: room.roundNumber,
     roundWins: room.roundWins,
     status: room.status,
@@ -53,10 +27,9 @@ function broadcastState(io: Server, room: Room): void {
 
 function startRound(io: Server, room: Room): void {
   room.roundNumber += 1;
-  room.ropePosition = 0;
   room.roundStartedAt = Date.now();
-  room.roundPower = { A: 0, B: 0 };
   room.status = 'PLAYING';
+  getMiniGame(room.gameType).resetRound(room);
 
   io.to(room.id).emit('game:start', {
     roomId: room.id,
@@ -118,37 +91,11 @@ export function endMatch(
 }
 
 function tick(io: Server, room: Room): void {
-  const powerA = sidePower(room, 'A');
-  const powerB = sidePower(room, 'B');
-
-  room.roundPower.A += powerA;
-  room.roundPower.B += powerB;
-
-  room.ropePosition += (powerA - powerB) * ROPE_SPEED * (TICK_RATE_MS / 1000);
-  room.ropePosition = Math.max(-ROPE_LIMIT, Math.min(ROPE_LIMIT, room.ropePosition));
-
+  const result = getMiniGame(room.gameType).tick(room);
   broadcastState(io, room);
 
-  if (room.ropePosition >= ROPE_LIMIT) {
-    endRound(io, room, 'A');
-    return;
-  }
-  if (room.ropePosition <= -ROPE_LIMIT) {
-    endRound(io, room, 'B');
-    return;
-  }
-
-  const elapsed = Date.now() - room.roundStartedAt;
-  if (elapsed >= ROUND_TIME_LIMIT_MS) {
-    const winner: Side =
-      room.roundPower.A === room.roundPower.B
-        ? room.ropePosition >= 0
-          ? 'A'
-          : 'B'
-        : room.roundPower.A > room.roundPower.B
-          ? 'A'
-          : 'B';
-    endRound(io, room, winner);
+  if (result.ended && result.winner) {
+    endRound(io, room, result.winner);
   }
 }
 

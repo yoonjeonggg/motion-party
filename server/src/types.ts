@@ -34,12 +34,19 @@ export interface Room {
   code: string;
   status: RoomStatus;
   mode: RoomMode;
+  /** Which MiniGameModule (server/src/games) runs this room's rounds. See FN-12. */
+  gameType: string;
   players: Player[];
   createdAt: number;
   roundNumber: number;
   roundWins: Record<Side, number>;
-  ropePosition: number;
   roundStartedAt: number;
+  /**
+   * Tug-of-war specific round state. A future minigame with different state
+   * (e.g. freeze-tag positions) would add its own field here rather than
+   * reuse these - the FN-12 abstraction only covers tick/round-outcome logic.
+   */
+  ropePosition: number;
   roundPower: Record<Side, number>;
   loopHandle: ReturnType<typeof setInterval> | null;
   roundResultTimeout: ReturnType<typeof setTimeout> | null;

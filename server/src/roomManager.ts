@@ -8,6 +8,7 @@ import {
   type RoomMode,
   type Side,
 } from './types.js';
+import { DEFAULT_GAME_TYPE } from './games/registry.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
@@ -29,6 +30,7 @@ export function createRoom(
   hostSocketId: string,
   nickname: string,
   mode: RoomMode = '1v1',
+  gameType: string = DEFAULT_GAME_TYPE,
 ): { room: Room; player: Player } {
   const player: Player = {
     id: randomUUID(),
@@ -47,6 +49,7 @@ export function createRoom(
     code: generateCode(),
     status: 'LOBBY',
     mode,
+    gameType,
     players: [player],
     createdAt: Date.now(),
     roundNumber: 0,
