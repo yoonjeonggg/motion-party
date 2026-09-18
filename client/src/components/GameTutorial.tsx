@@ -8,6 +8,10 @@ const PULL_THRESHOLD = 0.5;
 const MOVE_PHASE_MS = 4_000;
 const FREEZE_PHASE_MS = 3_000;
 const FREEZE_DEMO_THRESHOLD = 0.15;
+/** Mirrors server SYNC_MAX_BONUS (server/src/types.ts) so the demo's numbers match the real match. */
+const SYNC_MAX_BONUS = 0.3;
+const SYNC_BONUS_TARGET = 0.2;
+const SYNC_RHYTHM_PERIOD_MS = 1_400;
 
 const COPY: Record<GameType, { title: string; instruction: string; ruleText: string }> = {
   tug_of_war: {
@@ -33,11 +37,15 @@ export function GameTutorial() {
   const setScreen = useGameStore((s) => s.setScreen);
   const gameType = session?.gameType ?? 'tug_of_war';
   const isFreezeTag = gameType === 'freeze_tag';
+  /** 2v2 tug-style matches apply a teammate sync bonus (FN-10); freeze_tag never does. */
+  const showSyncDemo = !isFreezeTag && session?.mode === '2v2';
   const isReplay = useRef(hasSeenGameTutorial(gameType));
 
   const { videoRef, cameraState, motionScore, bodyMovementScore, poseDetected } = useMotionCapture(true, {
     expression: false,
   });
+  const motionScoreRef = useRef(0);
+  motionScoreRef.current = motionScore;
 
   const [reached, setReached] = useState(false);
   const reachedRef = useRef(false);
@@ -73,16 +81,47 @@ export function GameTutorial() {
     }
   }, [isFreezeTag, phase, bodyMovementScore]);
 
+  // Step 2 for 2v2 tug-style games only: practice matching a dummy teammate's rhythm (FN-10 sync bonus).
+  const [subStep, setSubStep] = useState<'PULL' | 'SYNC'>('PULL');
+  const isSync = subStep === 'SYNC' && showSyncDemo;
+  const [teammatePower, setTeammatePower] = useState(0);
+  const [syncBonus, setSyncBonus] = useState(0);
+  const [syncReached, setSyncReached] = useState(false);
+  const syncReachedRef = useRef(false);
+  const syncRafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isSync) return;
+    const startedAt = performance.now();
+
+    const loop = (time: number) => {
+      const elapsed = time - startedAt;
+      const teammate = (Math.sin(elapsed / (SYNC_RHYTHM_PERIOD_MS / (2 * Math.PI))) + 1) / 2;
+      const bonus = SYNC_MAX_BONUS * Math.max(0, 1 - Math.abs(motionScoreRef.current - teammate));
+      setTeammatePower(teammate);
+      setSyncBonus(bonus);
+      if (bonus >= SYNC_BONUS_TARGET && !syncReachedRef.current) {
+        syncReachedRef.current = true;
+        setSyncReached(true);
+      }
+      syncRafRef.current = requestAnimationFrame(loop);
+    };
+    syncRafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (syncRafRef.current) cancelAnimationFrame(syncRafRef.current);
+    };
+  }, [isSync]);
+
   function proceed() {
     markGameTutorialSeen(gameType);
     setScreen('WAITING');
   }
 
   const copy = COPY[gameType];
-  const canProceed = isFreezeTag ? cycleDone : reached;
   const showSkip = cameraState === 'READY';
   const demoVariant = isFreezeTag ? (phase === 'FREEZE' ? 'freeze' : 'move') : 'pull';
   const gaugeScore = isFreezeTag ? bodyMovementScore : motionScore;
+  const teamPowerPercent = Math.round(Math.min(1, (motionScore + teammatePower) / 2) * 100);
 
   return (
     <section className="screen tutorial">
@@ -103,20 +142,27 @@ export function GameTutorial() {
 
       {(cameraState === 'REQUESTING' || cameraState === 'READY') && (
         <div className="card">
-          <div className={`demo-figure ${demoVariant}`}>
-            <div className="demo-head" />
-            <div className="demo-body" />
-            <div className="demo-arm demo-arm-left" />
-            <div className="demo-arm demo-arm-right" />
-            <div className="demo-leg demo-leg-left" />
-            <div className="demo-leg demo-leg-right" />
-            {isFreezeTag && phase === 'FREEZE' && <div className="demo-ice">❄️</div>}
-          </div>
+          {!isSync && (
+            <div className={`demo-figure ${demoVariant}`}>
+              <div className="demo-head" />
+              <div className="demo-body" />
+              <div className="demo-arm demo-arm-left" />
+              <div className="demo-arm demo-arm-right" />
+              <div className="demo-leg demo-leg-left" />
+              <div className="demo-leg demo-leg-right" />
+              {isFreezeTag && phase === 'FREEZE' && <div className="demo-ice">❄️</div>}
+            </div>
+          )}
 
           {isFreezeTag ? (
             <div className={`banner phase-banner ${phase === 'FREEZE' ? 'freeze' : 'move'}`}>
               {phase === 'FREEZE' ? '얼음! 움직이면 안돼요' : '최대한 움직이세요!'}
             </div>
+          ) : isSync ? (
+            <>
+              <p className="instruction">2:2 팀전은 팀원과 타이밍이 맞을수록 팀 파워가 더 세져요!</p>
+              <p className="hint small">아래 연습 팀원의 리듬에 맞춰 같이 당겨보세요.</p>
+            </>
           ) : (
             <p className="instruction">{copy.instruction}</p>
           )}
@@ -130,24 +176,68 @@ export function GameTutorial() {
             />
           </div>
 
+          {isSync && (
+            <>
+              <p className="hint small">연습 팀원 파워</p>
+              <div className="gauge">
+                <div className="gauge-fill opponent" style={{ width: `${Math.round(teammatePower * 100)}%` }} />
+              </div>
+              <p className="hint small">팀 파워 (싱크 보너스 +{Math.round(syncBonus * 100)}%)</p>
+              <div className="gauge">
+                <div className="gauge-fill" style={{ width: `${teamPowerPercent}%` }} />
+              </div>
+            </>
+          )}
+
           {!poseDetected && <p className="hint small">카메라에 상반신이 잘 보이도록 조정해주세요</p>}
           {isFreezeTag && phase === 'FREEZE' && caught && (
             <p className="hint small">앗! 움직였어요 😱 얼음 상태에선 완전히 멈춰야 해요</p>
           )}
 
-          {canProceed ? (
-            <>
-              {!isFreezeTag && <p className="feedback">좋아요! 이렇게 하면 돼요 💪</p>}
-              <p className="hint">{copy.ruleText}</p>
-              <button type="button" className="primary" onClick={proceed}>
-                대기실로 이동
-              </button>
-            </>
-          ) : (
-            !isFreezeTag && (
+          {isFreezeTag &&
+            (cycleDone ? (
+              <>
+                <p className="hint">{copy.ruleText}</p>
+                <button type="button" className="primary" onClick={proceed}>
+                  대기실로 이동
+                </button>
+              </>
+            ) : null)}
+
+          {!isFreezeTag &&
+            !isSync &&
+            (reached ? (
+              <>
+                <p className="feedback">좋아요! 이렇게 하면 돼요 💪</p>
+                {showSyncDemo ? (
+                  <button type="button" className="primary" onClick={() => setSubStep('SYNC')}>
+                    다음: 팀워크 연습
+                  </button>
+                ) : (
+                  <>
+                    <p className="hint">{copy.ruleText}</p>
+                    <button type="button" className="primary" onClick={proceed}>
+                      대기실로 이동
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
               <p className="hint">카메라에 상반신이 잘 보이도록 위치를 조정하고, 팔을 크게 당겨보세요.</p>
-            )
-          )}
+            ))}
+
+          {isSync &&
+            (syncReached ? (
+              <>
+                <p className="feedback">싱크 완벽해요! 팀 파워가 크게 올라가요 🤝</p>
+                <p className="hint">{copy.ruleText}</p>
+                <button type="button" className="primary" onClick={proceed}>
+                  대기실로 이동
+                </button>
+              </>
+            ) : (
+              <p className="hint">팀원의 게이지가 올라갈 때 같이 당기고, 내려갈 때 같이 쉬어보세요.</p>
+            ))}
         </div>
       )}
     </section>
