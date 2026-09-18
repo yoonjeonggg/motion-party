@@ -8,8 +8,9 @@ const CALIBRATION_DURATION_MS = 3_000;
 export function Calibration() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
-  const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } =
-    useMotionCapture(true);
+  const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } = useMotionCapture(true, {
+    pose: false,
+  });
 
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<'CAPTURING' | 'RETRY' | 'DONE'>('CAPTURING');
