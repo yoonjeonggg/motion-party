@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createRoom, joinRoom } from '../hooks/useGameSocket';
+import { isExpressionEnabled, setExpressionEnabled } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
 import type { GameType, RoomMode } from '../types';
 
@@ -10,6 +11,14 @@ const GAME_OPTIONS: { value: GameType; label: string }[] = [
   { value: 'simon_says', label: '동작 따라하기' },
 ];
 
+/** Only tug-style games use FN-08 expression scoring; freeze_tag/simon_says never do. */
+const GAME_USES_EXPRESSION: Record<GameType, boolean> = {
+  tug_of_war: true,
+  arm_wrestle: true,
+  freeze_tag: false,
+  simon_says: false,
+};
+
 export function Lobby() {
   const nickname = useGameStore((s) => s.nickname);
   const setNickname = useGameStore((s) => s.setNickname);
@@ -19,6 +28,13 @@ export function Lobby() {
   const [codeInput, setCodeInput] = useState('');
   const [mode, setMode] = useState<RoomMode>('1v1');
   const [gameType, setGameType] = useState<GameType>('tug_of_war');
+  const [expressionOn, setExpressionOn] = useState(isExpressionEnabled());
+
+  function handleToggleExpression() {
+    const next = !expressionOn;
+    setExpressionOn(next);
+    setExpressionEnabled(next);
+  }
 
   function handleCreate() {
     setError(null);
@@ -79,6 +95,13 @@ export function Lobby() {
             2:2
           </button>
         </div>
+
+        {GAME_USES_EXPRESSION[gameType] && (
+          <label className="checkbox-field">
+            <input type="checkbox" checked={expressionOn} onChange={handleToggleExpression} />
+            <span>표정 인식 없이 동작만으로 플레이</span>
+          </label>
+        )}
 
         <button type="button" className="primary" onClick={handleCreate}>
           방 만들기

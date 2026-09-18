@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { submitCalibration } from '../hooks/useGameSocket';
 import { useMotionCapture } from '../hooks/useMotionCapture';
+import { isExpressionEnabled } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
 
 const CALIBRATION_DURATION_MS = 3_000;
@@ -8,7 +9,8 @@ const CALIBRATION_DURATION_MS = 3_000;
 export function Calibration() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
-  const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } = useMotionCapture(true, {
+  const expressionOn = isExpressionEnabled();
+  const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } = useMotionCapture(expressionOn, {
     pose: false,
   });
 
@@ -16,13 +18,21 @@ export function Calibration() {
   const [phase, setPhase] = useState<'CAPTURING' | 'RETRY' | 'DONE'>('CAPTURING');
   const everDetectedRef = useRef(false);
   const startedRef = useRef(false);
+  const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
     if (faceDetected) everDetectedRef.current = true;
   }, [faceDetected]);
 
+  // Nothing to calibrate when expression scoring is off - report a zero baseline right away.
   useEffect(() => {
-    if (cameraState !== 'READY' || startedRef.current) return;
+    if (expressionOn || !session || autoSubmittedRef.current) return;
+    autoSubmittedRef.current = true;
+    submitCalibration(session.roomId, session.playerId, 0);
+  }, [expressionOn, session]);
+
+  useEffect(() => {
+    if (!expressionOn || cameraState !== 'READY' || startedRef.current) return;
     startedRef.current = true;
     everDetectedRef.current = false;
     beginCalibration();
@@ -56,6 +66,20 @@ export function Calibration() {
   if (!session) return null;
 
   const calibratedCount = players.filter((p) => p.calibrated).length;
+
+  if (!expressionOn) {
+    return (
+      <section className="screen calibration">
+        <h1>표정 캘리브레이션</h1>
+        <div className="card">
+          <p className="feedback">표정 인식을 껐어요. 동작만으로 플레이해요!</p>
+          <p className="hint">
+            {calibratedCount}/{players.length}명 준비 완료 · 상대방을 기다리는 중...
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="screen calibration">

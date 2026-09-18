@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { sendPower } from '../hooks/useGameSocket';
 import { useMotionCapture } from '../hooks/useMotionCapture';
+import { isExpressionEnabled } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
 import type { Side } from '../types';
 
@@ -27,7 +28,9 @@ export function PlayScreen() {
   const opponentDisconnected = useGameStore((s) => s.opponentDisconnected);
   const updateHighlight = useGameStore((s) => s.updateHighlight);
 
-  const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true);
+  const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
+    expression: isExpressionEnabled(),
+  });
   const scoreRef = useRef(0);
   scoreRef.current = motionScore;
   const expressionRef = useRef(0);
