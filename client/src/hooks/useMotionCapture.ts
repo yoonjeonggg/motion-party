@@ -48,13 +48,23 @@ interface UseMotionCaptureResult {
 let sharedPosePromise: Promise<PoseLandmarker> | null = null;
 function getPoseLandmarker(): Promise<PoseLandmarker> {
   if (!sharedPosePromise) {
-    sharedPosePromise = FilesetResolver.forVisionTasks(WASM_BASE).then((fileset) =>
-      PoseLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numPoses: 1,
-      }),
-    );
+    sharedPosePromise = FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
+      const baseOptions = { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' as const };
+      try {
+        return await PoseLandmarker.createFromOptions(fileset, {
+          baseOptions,
+          runningMode: 'VIDEO',
+          numPoses: 1,
+        });
+      } catch {
+        // Some mobile browsers reject a WebGL-backed delegate (driver/memory quirks) - CPU still works, just slower.
+        return PoseLandmarker.createFromOptions(fileset, {
+          baseOptions: { ...baseOptions, delegate: 'CPU' },
+          runningMode: 'VIDEO',
+          numPoses: 1,
+        });
+      }
+    });
   }
   return sharedPosePromise;
 }
@@ -62,14 +72,24 @@ function getPoseLandmarker(): Promise<PoseLandmarker> {
 let sharedFacePromise: Promise<FaceLandmarker> | null = null;
 function getFaceLandmarker(): Promise<FaceLandmarker> {
   if (!sharedFacePromise) {
-    sharedFacePromise = FilesetResolver.forVisionTasks(WASM_BASE).then((fileset) =>
-      FaceLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numFaces: 1,
-        outputFaceBlendshapes: true,
-      }),
-    );
+    sharedFacePromise = FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
+      const baseOptions = { modelAssetPath: FACE_MODEL_URL, delegate: 'GPU' as const };
+      try {
+        return await FaceLandmarker.createFromOptions(fileset, {
+          baseOptions,
+          runningMode: 'VIDEO',
+          numFaces: 1,
+          outputFaceBlendshapes: true,
+        });
+      } catch {
+        return FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: { ...baseOptions, delegate: 'CPU' },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+          outputFaceBlendshapes: true,
+        });
+      }
+    });
   }
   return sharedFacePromise;
 }
@@ -109,7 +129,9 @@ export function useMotionCapture(
       setCameraState('REQUESTING');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
+          // `ideal` (not exact) so phones whose front camera doesn't support 640x480
+          // exactly still get a stream; facingMode picks the selfie camera on mobile.
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
           audio: false,
         });
         if (cancelled) {

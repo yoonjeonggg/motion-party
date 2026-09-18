@@ -134,6 +134,15 @@ button.primary {
   flex: 1;
 }
 
+.game-toggle {
+  flex-wrap: wrap;
+}
+
+.game-toggle button {
+  flex: 1 1 calc(50% - 4px);
+  min-width: 0;
+}
+
 .highlight-card {
   display: flex;
   flex-direction: column;

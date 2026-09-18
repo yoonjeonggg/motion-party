@@ -66,7 +66,7 @@ export function Lobby() {
           />
         </label>
 
-        <div className="mode-toggle">
+        <div className="mode-toggle game-toggle">
           {GAME_OPTIONS.map((opt) => (
             <button
               key={opt.value}
