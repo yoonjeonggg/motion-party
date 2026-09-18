@@ -12,17 +12,18 @@ function playersBySide(room: Room, side: Side) {
 }
 
 /**
- * Combined power for a side. In 2v2, teammates whose power is closely in sync
- * (per FN-10) get a multiplicative bonus on top of their summed power.
+ * Combined power for a side. In 2v2/4v4, teammates whose power is closely in sync
+ * (per FN-10) get a multiplicative bonus on top of their summed power. "In sync" is
+ * measured as the spread between the most and least powerful teammate right now -
+ * for exactly 2 players this is just |p1 - p2|, so 2v2 numbers are unchanged.
  */
 function sidePower(room: Room, side: Side): number {
   const powers = playersBySide(room, side).map(effectivePower);
   if (powers.length === 0) return 0;
   const sum = powers.reduce((a, b) => a + b, 0);
-  const [p1, p2] = powers;
-  if (p1 === undefined || p2 === undefined) return sum;
-  const diff = Math.abs(p1 - p2);
-  const syncBonus = 1 + SYNC_MAX_BONUS * Math.max(0, 1 - diff);
+  if (powers.length === 1) return sum;
+  const spread = Math.max(...powers) - Math.min(...powers);
+  const syncBonus = 1 + SYNC_MAX_BONUS * Math.max(0, 1 - spread);
   return sum * syncBonus;
 }
 

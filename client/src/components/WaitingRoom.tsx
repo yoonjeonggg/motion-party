@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
-import type { GameType } from '../types';
+import { MODE_LABELS, roomCapacity, type GameType } from '../types';
 
 const GAME_LABELS: Record<GameType, string> = {
   tug_of_war: '줄다리기',
@@ -35,7 +35,7 @@ export function WaitingRoom() {
     leaveRoom();
   }
 
-  const capacity = session.mode === '2v2' ? 4 : 2;
+  const capacity = roomCapacity(session.mode);
   const full = players.length >= capacity;
   const teamA = players.filter((p) => p.side === 'A');
   const teamB = players.filter((p) => p.side === 'B');
@@ -45,8 +45,7 @@ export function WaitingRoom() {
       <h1>대기실</h1>
       <div className="card">
         <p className="hint">
-          친구에게 방 코드를 공유하세요 · {GAME_LABELS[session.gameType]} ·{' '}
-          {session.mode === '2v2' ? '2:2 팀전' : '1:1 대결'}
+          친구에게 방 코드를 공유하세요 · {GAME_LABELS[session.gameType]} · {MODE_LABELS[session.mode]}
         </p>
         <div className="room-code" onClick={handleCopy}>
           {session.code}

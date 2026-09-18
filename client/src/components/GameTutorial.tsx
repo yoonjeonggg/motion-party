@@ -53,8 +53,8 @@ export function GameTutorial() {
   const isFreezeTag = gameType === 'freeze_tag';
   const isSimonSays = gameType === 'simon_says';
   const isTugStyle = !isFreezeTag && !isSimonSays;
-  /** 2v2 tug-style matches apply a teammate sync bonus (FN-10); freeze_tag/simon_says never do. */
-  const showSyncDemo = isTugStyle && session?.mode === '2v2';
+  /** 2v2/4v4 tug-style matches apply a teammate sync bonus (FN-10); freeze_tag/simon_says never do. */
+  const showSyncDemo = isTugStyle && session?.mode !== '1v1';
   const isReplay = useRef(hasSeenGameTutorial(gameType));
 
   const { videoRef, cameraState, motionScore, bodyMovementScore, gesture, poseDetected } = useMotionCapture(true, {

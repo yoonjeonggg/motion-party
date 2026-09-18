@@ -65,7 +65,7 @@ export function PlayScreen() {
   const mySide = session.side;
   const opponentSide = opposite(mySide);
   const me = players.find((p) => p.id === session.playerId);
-  const teammate = players.find((p) => p.side === mySide && p.id !== session.playerId);
+  const teammates = players.filter((p) => p.side === mySide && p.id !== session.playerId);
   const opponentTeam = players.filter((p) => p.side === opponentSide);
 
   const position = session.gameType === 'arm_wrestle' ? armPosition : ropePosition;
@@ -95,7 +95,8 @@ export function PlayScreen() {
         <div className="player-panel">
           <video ref={videoRef} className="preview mirrored small" muted playsInline />
           <p className="player-name">
-            {me?.nickname ?? '나'} (나){teammate && ` · ${teammate.nickname}`}
+            {me?.nickname ?? '나'} (나)
+            {teammates.length > 0 && ` · ${teammates.map((p) => p.nickname).join(' · ')}`}
           </p>
           {!poseDetected && <p className="hint small">카메라 각도를 조정해주세요</p>}
           <div className="gauge">

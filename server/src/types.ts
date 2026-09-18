@@ -8,7 +8,7 @@ export type RoomStatus =
   | 'MATCH_RESULT';
 
 export type Side = 'A' | 'B';
-export type RoomMode = '1v1' | '2v2';
+export type RoomMode = '1v1' | '2v2' | '4v4';
 
 export function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
@@ -55,7 +55,9 @@ export interface Room {
 
 /** Players allowed on one side for a given mode. */
 export function perSideCapacity(mode: RoomMode): number {
-  return mode === '2v2' ? 2 : 1;
+  if (mode === '4v4') return 4;
+  if (mode === '2v2') return 2;
+  return 1;
 }
 
 export function roomCapacity(mode: RoomMode): number {

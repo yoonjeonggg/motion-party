@@ -8,8 +8,25 @@ export type RoomStatus =
   | 'MATCH_RESULT';
 
 export type Side = 'A' | 'B';
-export type RoomMode = '1v1' | '2v2';
+export type RoomMode = '1v1' | '2v2' | '4v4';
 export type GameType = 'tug_of_war' | 'arm_wrestle' | 'freeze_tag' | 'simon_says';
+
+/** Mirrors server/src/types.ts's perSideCapacity/roomCapacity - kept in sync manually. */
+export function perSideCapacity(mode: RoomMode): number {
+  if (mode === '4v4') return 4;
+  if (mode === '2v2') return 2;
+  return 1;
+}
+
+export function roomCapacity(mode: RoomMode): number {
+  return perSideCapacity(mode) * 2;
+}
+
+export const MODE_LABELS: Record<RoomMode, string> = {
+  '1v1': '1:1 대결',
+  '2v2': '2:2 팀전',
+  '4v4': '4:4 팀전',
+};
 export type FreezeTagPhase = 'MOVE' | 'FREEZE';
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';

@@ -94,6 +94,13 @@ export function Lobby() {
           >
             2:2
           </button>
+          <button
+            type="button"
+            className={mode === '4v4' ? 'primary' : ''}
+            onClick={() => setMode('4v4')}
+          >
+            4:4
+          </button>
         </div>
 
         {GAME_USES_EXPRESSION[gameType] && (
