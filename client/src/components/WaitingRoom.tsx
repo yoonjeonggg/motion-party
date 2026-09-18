@@ -13,6 +13,7 @@ export function WaitingRoom() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
+  const setScreen = useGameStore((s) => s.setScreen);
   const [copied, setCopied] = useState(false);
 
   if (!session) return null;
@@ -83,6 +84,10 @@ export function WaitingRoom() {
           나가기
         </button>
       </div>
+
+      <button type="button" className="ghost" onClick={() => setScreen('GAME_TUTORIAL')}>
+        게임 방법 다시보기
+      </button>
     </section>
   );
 }

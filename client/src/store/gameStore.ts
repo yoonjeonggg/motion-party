@@ -14,6 +14,7 @@ import type {
 export type Screen =
   | 'ONBOARDING'
   | 'LOBBY'
+  | 'GAME_TUTORIAL'
   | 'WAITING'
   | 'CALIBRATING'
   | 'PLAYING'
