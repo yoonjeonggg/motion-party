@@ -45,6 +45,8 @@ interface GameStore {
   armPosition: number;
   phase: FreezeTagPhase;
   phaseRemainingMs: number;
+  cue: string;
+  cueRemainingMs: number;
   teamPower: Record<Side, number>;
   roundNumber: number;
   roundWins: Record<Side, number>;
@@ -77,6 +79,8 @@ const initialGameFields = {
   armPosition: 0,
   phase: 'MOVE' as FreezeTagPhase,
   phaseRemainingMs: 0,
+  cue: '' as string,
+  cueRemainingMs: 0,
   teamPower: { A: 0, B: 0 } as Record<Side, number>,
   roundNumber: 0,
   roundWins: { A: 0, B: 0 } as Record<Side, number>,
@@ -125,6 +129,8 @@ export const useGameStore = create<GameStore>((set) => ({
       armPosition: payload.armPosition ?? state.armPosition,
       phase: payload.phase ?? state.phase,
       phaseRemainingMs: payload.phaseRemainingMs ?? state.phaseRemainingMs,
+      cue: payload.cue ?? state.cue,
+      cueRemainingMs: payload.cueRemainingMs ?? state.cueRemainingMs,
       teamPower: payload.teamPower ?? state.teamPower,
       roundNumber: payload.roundNumber,
       roundWins: payload.roundWins,

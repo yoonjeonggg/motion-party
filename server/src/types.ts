@@ -90,3 +90,14 @@ export const FREEZE_TAG_FREEZE_PHASE_MS = 2_500;
 export const FREEZE_TAG_TIME_LIMIT_MS = 30_000;
 /** A side is "caught" if any of its players' body-movement score exceeds this during FREEZE. */
 export const FREEZE_TAG_MOVE_THRESHOLD = 0.12;
+
+// 동작 따라하기 (simon says)
+export const SIMON_SAYS_CUE_DURATION_MS = 2_500;
+export const SIMON_SAYS_TIME_LIMIT_MS = 30_000;
+/**
+ * Upper-body-only gesture set (shoulders/wrists), matching client/src/lib/poseGesture.ts's
+ * SIMON_SAYS_GESTURES. Kept in sync manually - the server only needs the ids to pick a cue,
+ * the client owns classifying landmarks into them and the Korean labels shown in the UI.
+ */
+export const SIMON_SAYS_GESTURES = ['LEFT_ARM_UP', 'RIGHT_ARM_UP', 'BOTH_ARMS_UP', 'ARMS_OUT'] as const;
+export type SimonSaysGesture = (typeof SIMON_SAYS_GESTURES)[number];

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMotionCapture } from '../hooks/useMotionCapture';
+import { GESTURE_LABELS, SIMON_SAYS_GESTURES } from '../lib/poseGesture';
 import { useGameStore } from '../store/gameStore';
 import type { GameType } from '../types';
 
@@ -12,6 +13,14 @@ const FREEZE_DEMO_THRESHOLD = 0.15;
 const SYNC_MAX_BONUS = 0.3;
 const SYNC_BONUS_TARGET = 0.2;
 const SYNC_RHYTHM_PERIOD_MS = 1_400;
+const SIMON_CUE_MS = 2_500;
+/** kebab-case CSS class suffix for each demoed gesture, e.g. LEFT_ARM_UP -> left-arm-up. */
+const SIMON_CLASS: Record<(typeof SIMON_SAYS_GESTURES)[number], string> = {
+  LEFT_ARM_UP: 'simon-left-arm-up',
+  RIGHT_ARM_UP: 'simon-right-arm-up',
+  BOTH_ARMS_UP: 'simon-both-arms-up',
+  ARMS_OUT: 'simon-arms-out',
+};
 
 const COPY: Record<GameType, { title: string; instruction: string; ruleText: string }> = {
   tug_of_war: {
@@ -29,6 +38,11 @@ const COPY: Record<GameType, { title: string; instruction: string; ruleText: str
     instruction: '',
     ruleText: '"움직이세요" 동안 최대한 움직이고, "얼음!"이 뜨면 완전히 멈추세요. 움직이다 걸리면 져요.',
   },
+  simon_says: {
+    title: '동작 따라하기 방법',
+    instruction: '',
+    ruleText: '화면에 뜨는 동작을 최대한 빠르고 정확하게 따라 하세요! 더 많이 맞힌 쪽이 승리해요.',
+  },
 };
 
 /** Per-game-mode "how to play" screen shown once per gameType, with a looping demo animation to mimic. */
@@ -37,11 +51,13 @@ export function GameTutorial() {
   const setScreen = useGameStore((s) => s.setScreen);
   const gameType = session?.gameType ?? 'tug_of_war';
   const isFreezeTag = gameType === 'freeze_tag';
-  /** 2v2 tug-style matches apply a teammate sync bonus (FN-10); freeze_tag never does. */
-  const showSyncDemo = !isFreezeTag && session?.mode === '2v2';
+  const isSimonSays = gameType === 'simon_says';
+  const isTugStyle = !isFreezeTag && !isSimonSays;
+  /** 2v2 tug-style matches apply a teammate sync bonus (FN-10); freeze_tag/simon_says never do. */
+  const showSyncDemo = isTugStyle && session?.mode === '2v2';
   const isReplay = useRef(hasSeenGameTutorial(gameType));
 
-  const { videoRef, cameraState, motionScore, bodyMovementScore, poseDetected } = useMotionCapture(true, {
+  const { videoRef, cameraState, motionScore, bodyMovementScore, gesture, poseDetected } = useMotionCapture(true, {
     expression: false,
   });
   const motionScoreRef = useRef(0);
@@ -50,11 +66,11 @@ export function GameTutorial() {
   const [reached, setReached] = useState(false);
   const reachedRef = useRef(false);
   useEffect(() => {
-    if (!isFreezeTag && motionScore >= PULL_THRESHOLD && !reachedRef.current) {
+    if (isTugStyle && motionScore >= PULL_THRESHOLD && !reachedRef.current) {
       reachedRef.current = true;
       setReached(true);
     }
-  }, [isFreezeTag, motionScore]);
+  }, [isTugStyle, motionScore]);
 
   const [phase, setPhase] = useState<'MOVE' | 'FREEZE'>('MOVE');
   const [cycleDone, setCycleDone] = useState(false);
@@ -80,6 +96,26 @@ export function GameTutorial() {
       setCaught(true);
     }
   }, [isFreezeTag, phase, bodyMovementScore]);
+
+  // simon_says only: cycle a demo pose every SIMON_CUE_MS and wait for the user to match it once.
+  const [demoCueIndex, setDemoCueIndex] = useState(0);
+  const demoCue = SIMON_SAYS_GESTURES[demoCueIndex % SIMON_SAYS_GESTURES.length]!;
+  const [simonMatched, setSimonMatched] = useState(false);
+  const simonMatchedRef = useRef(false);
+  useEffect(() => {
+    if (!isSimonSays) return;
+    const timer = setTimeout(() => {
+      setDemoCueIndex((i) => (i + 1) % SIMON_SAYS_GESTURES.length);
+    }, SIMON_CUE_MS);
+    return () => clearTimeout(timer);
+  }, [isSimonSays, demoCueIndex]);
+
+  useEffect(() => {
+    if (isSimonSays && gesture === demoCue && !simonMatchedRef.current) {
+      simonMatchedRef.current = true;
+      setSimonMatched(true);
+    }
+  }, [isSimonSays, gesture, demoCue]);
 
   // Step 2 for 2v2 tug-style games only: practice matching a dummy teammate's rhythm (FN-10 sync bonus).
   const [subStep, setSubStep] = useState<'PULL' | 'SYNC'>('PULL');
@@ -119,8 +155,14 @@ export function GameTutorial() {
 
   const copy = COPY[gameType];
   const showSkip = cameraState === 'READY';
-  const demoVariant = isFreezeTag ? (phase === 'FREEZE' ? 'freeze' : 'move') : 'pull';
-  const gaugeScore = isFreezeTag ? bodyMovementScore : motionScore;
+  const demoVariant = isFreezeTag
+    ? phase === 'FREEZE'
+      ? 'freeze'
+      : 'move'
+    : isSimonSays
+      ? SIMON_CLASS[demoCue]
+      : 'pull';
+  const gaugeScore = isFreezeTag ? bodyMovementScore : isSimonSays ? (gesture === demoCue ? 1 : 0) : motionScore;
   const teamPowerPercent = Math.round(Math.min(1, (motionScore + teammatePower) / 2) * 100);
 
   return (
@@ -158,6 +200,8 @@ export function GameTutorial() {
             <div className={`banner phase-banner ${phase === 'FREEZE' ? 'freeze' : 'move'}`}>
               {phase === 'FREEZE' ? '얼음! 움직이면 안돼요' : '최대한 움직이세요!'}
             </div>
+          ) : isSimonSays ? (
+            <div className="banner phase-banner move">지금 동작: {GESTURE_LABELS[demoCue]}!</div>
           ) : isSync ? (
             <>
               <p className="instruction">2:2 팀전은 팀원과 타이밍이 맞을수록 팀 파워가 더 세져요!</p>
@@ -204,7 +248,20 @@ export function GameTutorial() {
               </>
             ) : null)}
 
-          {!isFreezeTag &&
+          {isSimonSays &&
+            (simonMatched ? (
+              <>
+                <p className="feedback">좋아요! 이렇게 따라 하면 돼요 🙌</p>
+                <p className="hint">{copy.ruleText}</p>
+                <button type="button" className="primary" onClick={proceed}>
+                  대기실로 이동
+                </button>
+              </>
+            ) : (
+              <p className="hint">위 동작을 보고 최대한 똑같이 따라 해보세요.</p>
+            ))}
+
+          {isTugStyle &&
             !isSync &&
             (reached ? (
               <>

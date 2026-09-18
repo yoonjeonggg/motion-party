@@ -7,6 +7,7 @@ const GAME_LABELS: Record<GameType, string> = {
   tug_of_war: '줄다리기',
   arm_wrestle: '팔씨름',
   freeze_tag: '얼음땡',
+  simon_says: '동작 따라하기',
 };
 
 export function WaitingRoom() {

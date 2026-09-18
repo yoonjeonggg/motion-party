@@ -457,6 +457,7 @@ button.ghost {
   border-radius: 8px;
   background: var(--accent);
   transform-origin: top center;
+  transition: transform 0.3s ease;
 }
 
 .demo-arm-left {
@@ -596,4 +597,39 @@ button.ghost {
     opacity: 1;
     transform: scale(1.15);
   }
+}
+
+.demo-figure[class*='simon-'] {
+  animation: pose-pulse 1s ease-in-out infinite;
+}
+
+@keyframes pose-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.demo-figure.simon-left-arm-up .demo-arm-left {
+  transform: rotate(180deg);
+}
+
+.demo-figure.simon-right-arm-up .demo-arm-right {
+  transform: rotate(180deg);
+}
+
+.demo-figure.simon-both-arms-up .demo-arm-left,
+.demo-figure.simon-both-arms-up .demo-arm-right {
+  transform: rotate(180deg);
+}
+
+.demo-figure.simon-arms-out .demo-arm-left {
+  transform: rotate(90deg);
+}
+
+.demo-figure.simon-arms-out .demo-arm-right {
+  transform: rotate(-90deg);
 }

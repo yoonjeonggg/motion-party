@@ -2,6 +2,7 @@ import { FaceLandmarker, FilesetResolver, PoseLandmarker } from '@mediapipe/task
 import { useEffect, useRef, useState } from 'react';
 import { ExpressionScoreTracker, rawExpressionIntensity } from '../lib/expressionScore';
 import { BodyMovementTracker, MotionScoreTracker } from '../lib/motionScore';
+import { classifyGesture, type Gesture } from '../lib/poseGesture';
 
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
 const POSE_MODEL_URL =
@@ -34,6 +35,8 @@ interface UseMotionCaptureResult {
   poseDetected: boolean;
   /** Whole-body movement score (얼음땡), independent of the arm-specific motionScore. */
   bodyMovementScore: number;
+  /** Current classified upper-body pose (동작 따라하기), 'REST' when nothing recognized. */
+  gesture: Gesture;
   expressionScore: number;
   faceDetected: boolean;
   /** Starts collecting raw expression samples for baseline calibration. */
@@ -94,6 +97,7 @@ export function useMotionCapture(
   const [motionScore, setMotionScore] = useState(0);
   const [poseDetected, setPoseDetected] = useState(false);
   const [bodyMovementScore, setBodyMovementScore] = useState(0);
+  const [gesture, setGesture] = useState<Gesture>('REST');
   const [expressionScore, setExpressionScore] = useState(0);
   const [faceDetected, setFaceDetected] = useState(false);
 
@@ -142,6 +146,7 @@ export function useMotionCapture(
               const score = motionTrackerRef.current.update(landmarks);
               setMotionScore(score);
               setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
+              setGesture(classifyGesture(landmarks));
               if (poseDetectedRef.current !== Boolean(landmarks)) {
                 poseDetectedRef.current = Boolean(landmarks);
                 setPoseDetected(poseDetectedRef.current);
@@ -209,6 +214,7 @@ export function useMotionCapture(
     motionScore,
     poseDetected,
     bodyMovementScore,
+    gesture,
     expressionScore,
     faceDetected,
     beginCalibration,

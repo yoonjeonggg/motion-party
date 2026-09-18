@@ -7,6 +7,7 @@ const GAME_OPTIONS: { value: GameType; label: string }[] = [
   { value: 'tug_of_war', label: '줄다리기' },
   { value: 'arm_wrestle', label: '팔씨름' },
   { value: 'freeze_tag', label: '얼음땡' },
+  { value: 'simon_says', label: '동작 따라하기' },
 ];
 
 export function Lobby() {

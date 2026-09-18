@@ -9,7 +9,7 @@ export type RoomStatus =
 
 export type Side = 'A' | 'B';
 export type RoomMode = '1v1' | '2v2';
-export type GameType = 'tug_of_war' | 'arm_wrestle' | 'freeze_tag';
+export type GameType = 'tug_of_war' | 'arm_wrestle' | 'freeze_tag' | 'simon_says';
 export type FreezeTagPhase = 'MOVE' | 'FREEZE';
 
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED';
@@ -35,6 +35,9 @@ export interface GameStatePayload {
   /** freeze_tag only */
   phase?: FreezeTagPhase;
   phaseRemainingMs?: number;
+  /** simon_says only */
+  cue?: string;
+  cueRemainingMs?: number;
 }
 
 export interface RoundEndPayload {

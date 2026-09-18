@@ -8,6 +8,7 @@ import { Lobby } from './components/Lobby';
 import { MatchResult } from './components/MatchResult';
 import { PlayScreen } from './components/PlayScreen';
 import { RoundResult } from './components/RoundResult';
+import { SimonSaysPlayScreen } from './components/SimonSaysPlayScreen';
 import { WaitingRoom } from './components/WaitingRoom';
 import { useGameSocket } from './hooks/useGameSocket';
 import { useGameStore } from './store/gameStore';
@@ -17,7 +18,6 @@ function App() {
   const screen = useGameStore((s) => s.screen);
   const setScreen = useGameStore((s) => s.setScreen);
   const session = useGameStore((s) => s.session);
-  const isFreezeTag = session?.gameType === 'freeze_tag';
 
   useEffect(() => {
     if (screen === 'ONBOARDING' && !session && hasOnboarded()) {
@@ -41,7 +41,11 @@ function App() {
       {screen === 'GAME_TUTORIAL' && <GameTutorial />}
       {screen === 'WAITING' && <WaitingRoom />}
       {screen === 'CALIBRATING' && <Calibration />}
-      {screen === 'PLAYING' && (isFreezeTag ? <FreezeTagPlayScreen /> : <PlayScreen />)}
+      {screen === 'PLAYING' && session?.gameType === 'freeze_tag' && <FreezeTagPlayScreen />}
+      {screen === 'PLAYING' && session?.gameType === 'simon_says' && <SimonSaysPlayScreen />}
+      {screen === 'PLAYING' &&
+        session?.gameType !== 'freeze_tag' &&
+        session?.gameType !== 'simon_says' && <PlayScreen />}
       {screen === 'ROUND_RESULT' && <RoundResult />}
       {screen === 'MATCH_RESULT' && <MatchResult />}
     </main>
