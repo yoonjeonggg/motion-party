@@ -6,7 +6,7 @@ import {
   type Side,
   type SimonSaysGesture,
 } from '../types.js';
-import type { MiniGameModule, TickResult } from './miniGame.js';
+import { playersBySide, type MiniGameModule, type TickResult } from './miniGame.js';
 
 export const SIMON_SAYS_ID = 'simon_says';
 
@@ -24,10 +24,6 @@ function pickNextCue(current: SimonSaysGesture | null): SimonSaysGesture {
     next = SIMON_SAYS_GESTURES[Math.floor(Math.random() * SIMON_SAYS_GESTURES.length)]!;
   } while (next === current);
   return next;
-}
-
-function playersBySide(room: Room, side: Side) {
-  return room.players.filter((p) => p.side === side);
 }
 
 function resetRound(room: Room): void {

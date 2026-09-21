@@ -5,11 +5,7 @@ import {
   type Room,
   type Side,
 } from '../types.js';
-import type { MiniGameModule, TickResult } from './miniGame.js';
-
-function playersBySide(room: Room, side: Side) {
-  return room.players.filter((p) => p.side === side);
-}
+import { playersBySide, type MiniGameModule, type TickResult } from './miniGame.js';
 
 /**
  * Combined power for a side. In 2v2/4v4, teammates whose power is closely in sync
@@ -30,6 +26,8 @@ function sidePower(room: Room, side: Side): number {
 interface TugStyleState {
   position: number;
   power: Record<Side, number>;
+  /** This tick's instantaneous side power, cached by tick() so broadcastPayload doesn't recompute it. */
+  currentPower: Record<Side, number>;
 }
 
 export interface TugStyleOptions {
@@ -51,13 +49,18 @@ export interface TugStyleOptions {
  */
 export function createTugStyleModule(options: TugStyleOptions): MiniGameModule {
   function resetRound(room: Room): void {
-    room.gameState = { position: 0, power: { A: 0, B: 0 } } as TugStyleState;
+    room.gameState = {
+      position: 0,
+      power: { A: 0, B: 0 },
+      currentPower: { A: 0, B: 0 },
+    } as TugStyleState;
   }
 
   function tick(room: Room): TickResult {
     const state = room.gameState as TugStyleState;
     const powerA = sidePower(room, 'A');
     const powerB = sidePower(room, 'B');
+    state.currentPower = { A: powerA, B: powerB };
 
     state.power.A += powerA;
     state.power.B += powerB;
@@ -88,7 +91,7 @@ export function createTugStyleModule(options: TugStyleOptions): MiniGameModule {
     const state = room.gameState as TugStyleState;
     return {
       [options.positionField]: state.position,
-      teamPower: { A: sidePower(room, 'A'), B: sidePower(room, 'B') },
+      teamPower: state.currentPower,
     };
   }
 

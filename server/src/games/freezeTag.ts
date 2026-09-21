@@ -7,7 +7,7 @@ import {
   type Room,
   type Side,
 } from '../types.js';
-import type { MiniGameModule, TickResult } from './miniGame.js';
+import { playersBySide, type MiniGameModule, type TickResult } from './miniGame.js';
 
 export const FREEZE_TAG_ID = 'freeze_tag';
 
@@ -17,10 +17,6 @@ interface FreezeTagState {
   phase: Phase;
   phaseEndsAt: number;
   moveScore: Record<Side, number>;
-}
-
-function playersBySide(room: Room, side: Side) {
-  return room.players.filter((p) => p.side === side);
 }
 
 function resetRound(room: Room): void {

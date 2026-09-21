@@ -1,8 +1,13 @@
-import type { Room, Side } from '../types.js';
+import type { Player, Room, Side } from '../types.js';
 
 export interface TickResult {
   ended: boolean;
   winner?: Side;
+}
+
+/** Shared by every minigame's tick/broadcast logic to split the roster by team. */
+export function playersBySide(room: Room, side: Side): Player[] {
+  return room.players.filter((p) => p.side === side);
 }
 
 /**
