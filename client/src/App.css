@@ -4,6 +4,13 @@
   min-height: 100svh;
   padding-block: 24px;
   box-sizing: border-box;
+  transition: background 0.3s ease;
+}
+
+.app-root:has(.screen.play),
+.app-root:has(.screen.round-result),
+.app-root:has(.screen.tutorial) {
+  background: linear-gradient(165deg, var(--bg-game-start) 0%, var(--bg-game-end) 100%);
 }
 
 .screen {
@@ -22,7 +29,7 @@
 }
 
 .hint {
-  color: var(--text);
+  color: var(--text-tertiary);
   font-size: 14px;
   text-align: center;
 }
@@ -45,6 +52,19 @@
   gap: 14px;
   align-items: stretch;
   text-align: center;
+  box-shadow: var(--shadow);
+}
+
+/* Calibration/tutorial cards hold a single full-size camera preview - let
+   them grow wider than the default card cap so the preview reads bigger. */
+.card:has(> .preview:not(.small)) {
+  max-width: 640px;
+}
+
+.screen.tutorial .card,
+.screen.play .card,
+.screen.round-result .card {
+  background: var(--bg);
 }
 
 .error-card {
@@ -68,11 +88,17 @@
 
 .field input {
   font: inherit;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
   background: var(--bg);
   color: var(--text-h);
+  transition: border-color 0.15s;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .checkbox-field {
@@ -92,18 +118,23 @@
 
 button {
   font: inherit;
-  font-weight: 600;
-  padding: 12px 20px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  font-weight: 700;
+  padding: 13px 20px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
   background: var(--bg);
-  color: var(--text-h);
+  color: var(--text);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
 
 button:hover {
   border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+button:active {
+  transform: scale(0.98);
 }
 
 button.primary {
@@ -112,8 +143,13 @@ button.primary {
   border-color: transparent;
 }
 
+button.primary:hover {
+  background: var(--accent-hover);
+  color: white;
+}
+
 .divider {
-  color: var(--text);
+  color: var(--text-tertiary);
   font-size: 12px;
   text-align: center;
   position: relative;
@@ -166,8 +202,8 @@ button.primary {
 }
 
 .preview.small {
-  aspect-ratio: 1 / 1;
-  max-width: 160px;
+  aspect-ratio: 4 / 3;
+  max-width: 260px;
 }
 
 .preview.placeholder {
@@ -177,7 +213,7 @@ button.primary {
   color: white;
   font-size: 48px;
   font-weight: 700;
-  background: var(--side-b);
+  background: var(--neutral-fill);
 }
 
 .mirrored {
@@ -188,7 +224,7 @@ button.primary {
   width: 100%;
   height: 18px;
   border-radius: 999px;
-  background: var(--border);
+  background: var(--accent-bg);
   overflow: hidden;
 }
 
@@ -199,17 +235,17 @@ button.primary {
 }
 
 .gauge-fill.opponent {
-  background: var(--side-b);
+  background: var(--neutral-fill);
 }
 
 .instruction {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
 }
 
 .feedback {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .feedback.big {
@@ -223,9 +259,15 @@ button.primary {
   letter-spacing: 6px;
   color: var(--text-h);
   cursor: pointer;
-  padding: 12px;
-  border: 2px dashed var(--accent-border);
-  border-radius: 12px;
+  padding: 12px 20px;
+  background: var(--accent-bg);
+  border: 1.5px dashed var(--accent-border);
+  border-radius: 14px;
+  transition: border-color 0.15s;
+}
+
+.room-code:hover {
+  border-color: var(--accent);
 }
 
 .player-list {
@@ -275,7 +317,7 @@ button.primary {
 }
 
 .scoreboard {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
   margin-bottom: 4px;
 }
@@ -363,7 +405,7 @@ button.primary {
 
 .player-panel {
   flex: 1;
-  max-width: 220px;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -371,7 +413,7 @@ button.primary {
 }
 
 .player-name {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
   font-size: 14px;
 }
