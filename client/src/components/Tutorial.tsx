@@ -19,7 +19,10 @@ function dummyPower(elapsedMs: number): number {
 
 export function Tutorial() {
   const setScreen = useGameStore((s) => s.setScreen);
-  const { videoRef, cameraState, motionScore, poseDetected, expressionScore } = useMotionCapture(true);
+  const { videoRef, cameraState, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
+    bodyMovement: false,
+    gesture: false,
+  });
 
   const [step, setStep] = useState<Step>('DEMO');
   const [reachedThreshold, setReachedThreshold] = useState(false);

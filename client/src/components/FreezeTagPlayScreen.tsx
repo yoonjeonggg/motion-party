@@ -22,7 +22,11 @@ export function FreezeTagPlayScreen() {
   const phaseRemainingMs = useGameStore((s) => s.phaseRemainingMs);
   const opponentDisconnected = useGameStore((s) => s.opponentDisconnected);
 
-  const { videoRef, bodyMovementScore, poseDetected } = useMotionCapture(true, { expression: false });
+  const { videoRef, bodyMovementScore, poseDetected } = useMotionCapture(true, {
+    expression: false,
+    motion: false,
+    gesture: false,
+  });
   const scoreRef = useRef(0);
   scoreRef.current = bodyMovementScore;
 

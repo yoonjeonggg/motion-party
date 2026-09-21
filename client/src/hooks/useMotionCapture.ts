@@ -26,6 +26,12 @@ interface UseMotionCaptureOptions {
   expression?: boolean;
   /** Whether to run PoseLandmarker at all. Default true; disable when only expression is needed (e.g. calibration). */
   pose?: boolean;
+  /** Whether to track arm-angle motionScore (줄다리기/팔씨름). Default true; disable when the caller never reads it (perf: skips a setState per frame). */
+  motion?: boolean;
+  /** Whether to track whole-body bodyMovementScore (얼음땡). Default true; disable when the caller never reads it. */
+  bodyMovement?: boolean;
+  /** Whether to classify the upper-body gesture (동작 따라하기). Default true; disable when the caller never reads it. */
+  gesture?: boolean;
 }
 
 interface UseMotionCaptureResult {
@@ -100,6 +106,9 @@ export function useMotionCapture(
 ): UseMotionCaptureResult {
   const useExpression = options.expression ?? true;
   const usePose = options.pose ?? true;
+  const useMotion = options.motion ?? true;
+  const useBodyMovement = options.bodyMovement ?? true;
+  const useGesture = options.gesture ?? true;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const motionTrackerRef = useRef(new MotionScoreTracker());
@@ -165,10 +174,11 @@ export function useMotionCapture(
             if (poseLandmarker) {
               const poseResult = poseLandmarker.detectForVideo(video, now);
               const landmarks = poseResult.landmarks[0] ?? null;
-              const score = motionTrackerRef.current.update(landmarks);
-              setMotionScore(score);
-              setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
-              setGesture(classifyGesture(landmarks));
+              // Only track/setState the scores this caller actually reads - each
+              // setState is a re-render, and most screens only need one of the three.
+              if (useMotion) setMotionScore(motionTrackerRef.current.update(landmarks));
+              if (useBodyMovement) setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
+              if (useGesture) setGesture(classifyGesture(landmarks));
               if (poseDetectedRef.current !== Boolean(landmarks)) {
                 poseDetectedRef.current = Boolean(landmarks);
                 setPoseDetected(poseDetectedRef.current);

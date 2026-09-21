@@ -27,7 +27,11 @@ export function SimonSaysPlayScreen() {
   const cueRemainingMs = useGameStore((s) => s.cueRemainingMs);
   const opponentDisconnected = useGameStore((s) => s.opponentDisconnected);
 
-  const { videoRef, gesture, poseDetected } = useMotionCapture(true, { expression: false });
+  const { videoRef, gesture, poseDetected } = useMotionCapture(true, {
+    expression: false,
+    motion: false,
+    bodyMovement: false,
+  });
   const gestureRef = useRef<Gesture>('REST');
   gestureRef.current = gesture;
   const cueRef = useRef(cue);

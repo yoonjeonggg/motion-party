@@ -30,6 +30,8 @@ export function PlayScreen() {
 
   const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
     expression: isExpressionEnabled(),
+    bodyMovement: false,
+    gesture: false,
   });
   const scoreRef = useRef(0);
   scoreRef.current = motionScore;
