@@ -14,7 +14,7 @@ export function SimonSaysPlayScreen() {
   const cue = useGameStore((s) => s.cue);
   const cueRemainingMs = useGameStore((s) => s.cueRemainingMs);
 
-  const { videoRef, gesture, poseDetected } = useMotionCapture(true, {
+  const { videoRef, cameraState, gesture, poseDetected } = useMotionCapture(true, {
     expression: false,
     motion: false,
     bodyMovement: false,
@@ -41,6 +41,7 @@ export function SimonSaysPlayScreen() {
       }
       videoRef={videoRef}
       poseDetected={poseDetected}
+      cameraState={cameraState}
       myStats={
         <>
           <p className="hint small">{matched ? '일치! 👍' : `내 동작: ${GESTURE_LABELS[gesture]}`}</p>

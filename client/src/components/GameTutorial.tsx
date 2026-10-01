@@ -163,18 +163,33 @@ export function GameTutorial() {
 
   return (
     <section className="screen tutorial">
-      {cameraState === 'READY' && (
-        <button type="button" className={`skip-link${isReplay ? ' prominent' : ''}`} onClick={proceed}>
-          건너뛰기
-        </button>
-      )}
+      {/* Always offered - otherwise a camera that never comes up would leave no way to the waiting room. */}
+      <button type="button" className={`skip-link${isReplay ? ' prominent' : ''}`} onClick={proceed}>
+        건너뛰기
+      </button>
 
       <h1>{copy.title}</h1>
 
-      {cameraState === 'DENIED' && (
+      {(cameraState === 'DENIED' || cameraState === 'ERROR') && (
         <div className="card error-card">
-          <p>카메라 권한이 거부되었어요.</p>
-          <p className="hint">브라우저 주소창의 카메라 아이콘에서 권한을 허용한 뒤 다시 시도해주세요.</p>
+          {cameraState === 'DENIED' ? (
+            <>
+              <p>카메라 권한이 거부되었어요.</p>
+              <p className="hint">브라우저 주소창의 카메라 아이콘에서 권한을 허용한 뒤 다시 시도해 주세요.</p>
+            </>
+          ) : (
+            <>
+              <p>카메라를 불러오지 못했어요.</p>
+              <p className="hint">다른 앱이 카메라를 쓰고 있지 않은지 확인하거나, Chrome/Safari 최신 버전에서 시도해 주세요.</p>
+            </>
+          )}
+          <p className="hint">{copy.ruleText}</p>
+          <div className="button-row">
+            <button type="button" onClick={() => window.location.reload()}>
+              다시 시도
+            </button>
+            <ProceedButton onClick={proceed} />
+          </div>
         </div>
       )}
 
@@ -220,9 +235,9 @@ export function GameTutorial() {
             </>
           )}
 
-          {!poseDetected && <p className="hint small">카메라에 상반신이 잘 보이도록 조정해주세요</p>}
+          {!poseDetected && <p className="hint small warn">카메라에 상반신이 잘 보이도록 조정해주세요</p>}
           {isFreezeTag && freeze.isFreeze && freeze.caught && (
-            <p className="hint small">앗! 움직였어요 😱 얼음 상태에선 완전히 멈춰야 해요</p>
+            <p className="hint small warn">앗! 움직였어요 😱 얼음 상태에선 완전히 멈춰야 해요</p>
           )}
 
           {isFreezeTag && freeze.cycleDone && (
@@ -260,7 +275,7 @@ export function GameTutorial() {
                 )}
               </>
             ) : (
-              <p className="hint">카메라에 상반신이 잘 보이도록 위치를 조정하고, 팔을 크게 당겨보세요.</p>
+              <p className="hint">게이지가 절반을 넘을 때까지 팔을 크게 당겨보세요.</p>
             ))}
 
           {isSync &&

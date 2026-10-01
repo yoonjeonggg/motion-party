@@ -29,7 +29,7 @@ export function PlayScreen() {
   const teamPower = useGameStore((s) => s.teamPower);
   const updateHighlight = useGameStore((s) => s.updateHighlight);
 
-  const { videoRef, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
+  const { videoRef, cameraState, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
     expression: isExpressionEnabled(),
     bodyMovement: false,
     gesture: false,
@@ -55,9 +55,10 @@ export function PlayScreen() {
   return (
     <PlayLayout
       gameLabel={GAME_LABELS[session.gameType]}
-      arena={<RopeTrack position={position} />}
+      arena={<RopeTrack position={position} mySide={session.side} />}
       videoRef={videoRef}
       poseDetected={poseDetected}
+      cameraState={cameraState}
       myStats={
         <>
           <Gauge value={motionScore * (1 + expressionScore)} />

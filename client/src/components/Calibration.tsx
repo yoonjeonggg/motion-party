@@ -17,7 +17,7 @@ export function Calibration() {
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<'CAPTURING' | 'RETRY' | 'DONE'>('CAPTURING');
   const everDetectedRef = useRef(false);
-  const startedRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
   const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -31,9 +31,10 @@ export function Calibration() {
     submitCalibration(session.roomId, session.playerId, 0);
   }, [expressionOn, session]);
 
+  // Re-runs per attempt: bumping `attempt` is what makes "다시 시도" actually restart capture
+  // (cameraState stays READY, so it alone wouldn't re-trigger this effect).
   useEffect(() => {
-    if (!expressionOn || cameraState !== 'READY' || startedRef.current) return;
-    startedRef.current = true;
+    if (!expressionOn || cameraState !== 'READY') return;
     everDetectedRef.current = false;
     beginCalibration();
 
@@ -55,13 +56,22 @@ export function Calibration() {
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraState]);
+  }, [cameraState, attempt]);
 
   function retry() {
-    startedRef.current = false;
     setProgress(0);
     setPhase('CAPTURING');
+    setAttempt((n) => n + 1);
   }
+
+  /** Camera unusable or face never found: report a neutral baseline so the room isn't stuck waiting on us. */
+  function continueWithoutCalibration() {
+    if (!session) return;
+    setPhase('DONE');
+    submitCalibration(session.roomId, session.playerId, 0);
+  }
+
+  const cameraFailed = cameraState === 'DENIED' || cameraState === 'ERROR';
 
   if (!session) return null;
 
@@ -85,24 +95,47 @@ export function Calibration() {
     <section className="screen calibration">
       <h1>표정 캘리브레이션</h1>
       <div className="card">
-        <video ref={videoRef} className="preview mirrored" muted playsInline />
+        <p className="hint">평소 표정을 기준으로 저장해서, 경기 중 힘든 표정을 더 정확하게 인식해요.</p>
+        {!cameraFailed && <video ref={videoRef} className="preview mirrored" muted playsInline />}
 
-        {phase === 'CAPTURING' && (
+        {cameraFailed && phase !== 'DONE' && (
+          <>
+            <p className="error-text">
+              {cameraState === 'DENIED' ? '카메라 권한이 거부되었어요.' : '카메라를 불러오지 못했어요.'}
+            </p>
+            <p className="hint">권한을 허용한 뒤 다시 시도하거나, 표정 보너스 없이 바로 진행할 수 있어요.</p>
+            <div className="button-row">
+              <button type="button" onClick={() => window.location.reload()}>
+                다시 시도
+              </button>
+              <button type="button" className="primary" onClick={continueWithoutCalibration}>
+                표정 없이 진행
+              </button>
+            </div>
+          </>
+        )}
+
+        {!cameraFailed && phase === 'CAPTURING' && (
           <>
             <p className="instruction">편안한 표정을 유지해주세요</p>
             <div className="gauge">
               <div className="gauge-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
-            {!faceDetected && <p className="hint small">얼굴이 잘 보이도록 카메라를 조정해주세요</p>}
+            {!faceDetected && <p className="hint small warn">얼굴이 잘 보이도록 카메라를 조정해주세요</p>}
           </>
         )}
 
         {phase === 'RETRY' && (
           <>
-            <p className="hint">얼굴을 인식하지 못했어요. 카메라 각도를 조정한 뒤 다시 시도해주세요.</p>
-            <button type="button" className="primary" onClick={retry}>
-              다시 시도
-            </button>
+            <p className="hint">얼굴을 인식하지 못했어요. 카메라 각도를 조정한 뒤 다시 시도해 주세요.</p>
+            <div className="button-row">
+              <button type="button" onClick={continueWithoutCalibration}>
+                건너뛰기
+              </button>
+              <button type="button" className="primary" onClick={retry}>
+                다시 시도
+              </button>
+            </div>
           </>
         )}
 

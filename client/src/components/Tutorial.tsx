@@ -75,11 +75,9 @@ export function Tutorial() {
     setScreen('LOBBY');
   }
 
-  const showSkip =
-    step === 'EXPRESSION_DEMO' ||
-    step === 'RULES' ||
-    step === 'PRACTICE' ||
-    (step === 'DEMO' && cameraState === 'READY');
+  // Always available (except once practice shows its own exit), including when the camera is
+  // denied/broken - otherwise onboarding would trap the player with no way to the lobby.
+  const showSkip = !practiceDone;
 
   return (
     <section className="screen tutorial">
@@ -102,16 +100,30 @@ export function Tutorial() {
           {cameraState === 'DENIED' && (
             <div className="card error-card">
               <p>카메라 권한이 거부되었어요.</p>
-              <p className="hint">브라우저 주소창의 카메라 아이콘에서 권한을 허용한 뒤 다시 시도해주세요.</p>
-              <button type="button" onClick={() => window.location.reload()}>
-                다시 시도
-              </button>
+              <p className="hint">브라우저 주소창의 카메라 아이콘에서 권한을 허용한 뒤 다시 시도해 주세요.</p>
+              <div className="button-row">
+                <button type="button" onClick={() => window.location.reload()}>
+                  다시 시도
+                </button>
+                <button type="button" className="primary" onClick={finish}>
+                  로비로 이동
+                </button>
+              </div>
             </div>
           )}
 
           {cameraState === 'ERROR' && (
             <div className="card error-card">
-              <p>카메라를 불러오지 못했어요. 다른 브라우저(Chrome/Edge)에서 시도해주세요.</p>
+              <p>카메라를 불러오지 못했어요.</p>
+              <p className="hint">다른 앱이 카메라를 쓰고 있지 않은지 확인하거나, Chrome/Safari 최신 버전에서 시도해 주세요.</p>
+              <div className="button-row">
+                <button type="button" onClick={() => window.location.reload()}>
+                  다시 시도
+                </button>
+                <button type="button" className="primary" onClick={finish}>
+                  로비로 이동
+                </button>
+              </div>
             </div>
           )}
 
@@ -176,7 +188,7 @@ export function Tutorial() {
             <div className="player-panel">
               <video ref={videoRef} className="preview mirrored small" muted playsInline />
               <p className="player-name">나</p>
-              {!poseDetected && <p className="hint small">카메라 각도를 조정해주세요</p>}
+              {!poseDetected && <p className="hint small warn">카메라 각도를 조정해주세요</p>}
               <Gauge value={motionScore} />
             </div>
 

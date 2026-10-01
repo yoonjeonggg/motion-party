@@ -12,7 +12,7 @@ export function FreezeTagPlayScreen() {
   const phase = useGameStore((s) => s.phase);
   const phaseRemainingMs = useGameStore((s) => s.phaseRemainingMs);
 
-  const { videoRef, bodyMovementScore, poseDetected } = useMotionCapture(true, {
+  const { videoRef, cameraState, bodyMovementScore, poseDetected } = useMotionCapture(true, {
     expression: false,
     motion: false,
     gesture: false,
@@ -35,6 +35,7 @@ export function FreezeTagPlayScreen() {
       }
       videoRef={videoRef}
       poseDetected={poseDetected}
+      cameraState={cameraState}
       myStats={
         <>
           <Gauge value={bodyMovementScore} alt={isFreeze} />

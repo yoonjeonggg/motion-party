@@ -2,22 +2,26 @@
   display: flex;
   flex-direction: column;
   min-height: 100svh;
-  padding-block: 24px;
+  padding-block: 16px calc(24px + env(safe-area-inset-bottom));
   box-sizing: border-box;
+}
+
+/* Paint the game backdrop on the whole page, not just the centered 720px column. */
+body {
   transition: background 0.3s ease;
 }
 
-.app-root:has(.screen.play),
-.app-root:has(.screen.round-result),
-.app-root:has(.screen.tutorial) {
-  background: linear-gradient(165deg, var(--bg-game-start) 0%, var(--bg-game-end) 100%);
+body:has(.screen.play),
+body:has(.screen.round-result),
+body:has(.screen.tutorial) {
+  background: linear-gradient(165deg, var(--bg-game-start) 0%, var(--bg-game-end) 100%) fixed;
 }
 
 .screen {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex: 1;
 }
 
@@ -35,7 +39,11 @@
 }
 
 .hint.small {
-  font-size: 12px;
+  font-size: 13px;
+}
+
+/* Something the player should fix (camera angle, moved while frozen...) - neutral hints stay grey. */
+.hint.warn {
   color: var(--side-a);
 }
 
@@ -53,6 +61,13 @@
   align-items: stretch;
   text-align: center;
   box-shadow: var(--shadow);
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 18px 16px;
+    gap: 12px;
+  }
 }
 
 /* Calibration/tutorial cards hold a single full-size camera preview - let
@@ -137,6 +152,38 @@ button:active {
   transform: scale(0.98);
 }
 
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button:focus-visible,
+a.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A link that looks like a regular button (e.g. a download link). */
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  padding: 13px 20px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+a.button:hover {
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
 button.primary {
   background: var(--accent);
   color: white;
@@ -149,16 +196,41 @@ button.primary:hover {
 }
 
 .divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--text-tertiary);
   font-size: 12px;
-  text-align: center;
-  position: relative;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 
 .button-row {
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+.button-row > * {
+  flex: 1;
+}
+
+.lobby-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-label {
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
 }
 
 .mode-toggle {
@@ -183,7 +255,8 @@ button.primary:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding-top: 4px;
 }
 
 .highlight-image {
@@ -196,14 +269,17 @@ button.primary:hover {
 .preview {
   width: 100%;
   aspect-ratio: 4 / 3;
+  /* Keep the camera from pushing the instructions and buttons below the fold. */
+  max-height: 42svh;
   border-radius: 12px;
   background: #000;
   object-fit: cover;
+  display: block;
 }
 
 .preview.small {
   aspect-ratio: 4 / 3;
-  max-width: 260px;
+  max-height: none;
 }
 
 .preview.placeholder {
@@ -252,11 +328,51 @@ button.primary:hover {
   font-size: 24px;
 }
 
+.result-headline {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.result-headline.lose {
+  color: var(--text-h);
+}
+
+.result-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.result-score > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+}
+
+.result-score strong {
+  font-size: 32px;
+  line-height: 1.1;
+  font-family: var(--mono);
+}
+
+.result-score .label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
 .room-code {
   font-family: var(--mono);
-  font-size: 40px;
+  font-size: clamp(30px, 10vw, 40px);
   font-weight: 700;
-  letter-spacing: 6px;
+  letter-spacing: 0.15em;
+  /* letter-spacing adds trailing space after the last character; offset it so the code stays centered. */
+  text-indent: 0.15em;
   color: var(--text-h);
   cursor: pointer;
   padding: 12px 20px;
@@ -264,6 +380,17 @@ button.primary:hover {
   border: 1.5px dashed var(--accent-border);
   border-radius: 14px;
   transition: border-color 0.15s;
+}
+
+.room-code-caption {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: -6px;
+}
+
+.room-code-caption.copied {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .room-code:hover {
@@ -281,22 +408,64 @@ button.primary:hover {
 
 .team-columns {
   display: flex;
-  gap: 24px;
+  gap: 12px;
   justify-content: center;
 }
 
-.team-columns .player-list {
+.team-column {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
 }
 
 .player-list li {
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-h);
+  text-align: left;
+}
+
+.player-list li.empty {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.player-list li.disconnected {
+  opacity: 0.6;
+}
+
+.player-list .nickname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-list .tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex: none;
 }
 
 .badge {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -317,9 +486,22 @@ button.primary:hover {
 }
 
 .scoreboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   font-weight: 700;
   color: var(--text-h);
-  margin-bottom: 4px;
+}
+
+.scoreboard .round {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.scoreboard .score {
+  font-size: 20px;
 }
 
 .banner {
@@ -350,27 +532,42 @@ button.primary:hover {
   color: var(--side-b);
 }
 
+.rope {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rope-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .rope-track {
   position: relative;
   width: 100%;
-  max-width: 480px;
   height: 28px;
   border-radius: 999px;
   overflow: hidden;
   display: flex;
-  margin: 8px 0 16px;
   border: 1px solid var(--border);
+  box-sizing: border-box;
 }
 
 .rope-zone {
   flex: 1;
 }
 
-.zone-a {
+.zone-A {
   background: color-mix(in srgb, var(--side-a) 25%, transparent);
 }
 
-.zone-b {
+.zone-B {
   background: color-mix(in srgb, var(--side-b) 25%, transparent);
 }
 
@@ -399,30 +596,36 @@ button.primary:hover {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
+  margin-top: 4px;
 }
 
 .player-panel {
   flex: 1;
-  max-width: 320px;
+  min-width: 0;
+  max-width: 280px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
+  text-align: center;
 }
 
 .player-name {
   font-weight: 700;
   color: var(--text-h);
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .vs {
-  align-self: center;
+  flex: none;
   font-weight: 700;
+  font-size: 14px;
   color: var(--text);
-  padding-top: 60px;
+  /* Roughly the vertical middle of the 4:3 camera previews beside it. */
+  margin-top: clamp(40px, 15vw, 90px);
 }
 
 .screen.tutorial {
@@ -433,7 +636,7 @@ button.primary:hover {
   position: absolute;
   top: 0;
   right: 0;
-  padding: 4px 8px;
+  padding: 8px 10px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -462,6 +665,8 @@ button.ghost {
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .demo-figure {
