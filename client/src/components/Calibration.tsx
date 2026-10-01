@@ -9,7 +9,7 @@ const CALIBRATION_DURATION_MS = 3_000;
 export function Calibration() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
-  const expressionOn = isExpressionEnabled();
+  const [expressionOn] = useState(isExpressionEnabled);
   const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } = useMotionCapture(expressionOn, {
     pose: false,
   });

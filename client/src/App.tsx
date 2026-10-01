@@ -11,7 +11,7 @@ import { SimonSaysPlayScreen } from './components/SimonSaysPlayScreen';
 import { Tutorial } from './components/Tutorial';
 import { WaitingRoom } from './components/WaitingRoom';
 import { useGameSocket } from './hooks/useGameSocket';
-import { hasOnboarded, hasSeenGameTutorial } from './lib/preferences';
+import { hasSeenGameTutorial } from './lib/preferences';
 import { useGameStore, type Screen } from './store/gameStore';
 import type { GameType } from './types';
 
@@ -38,13 +38,6 @@ function App() {
   const screen = useGameStore((s) => s.screen);
   const setScreen = useGameStore((s) => s.setScreen);
   const session = useGameStore((s) => s.session);
-
-  useEffect(() => {
-    if (screen === 'ONBOARDING' && !session && hasOnboarded()) {
-      setScreen('LOBBY');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Right after joining/creating a room, detour into the per-game-mode "how to
   // play" demo the first time that gameType is played, before entering WAITING.

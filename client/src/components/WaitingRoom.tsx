@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { exitRoom } from '../hooks/useGameSocket';
+import { preloadVisionModels } from '../hooks/useMotionCapture';
+import { isExpressionEnabled } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
-import { GAME_LABELS, MODE_LABELS, perSideCapacity, roomCapacity, SIDES, type PublicPlayer, type Side } from '../types';
+import { GAME_LABELS, isTugStyleGame, MODE_LABELS, perSideCapacity, roomCapacity, SIDES, type PublicPlayer, type Side } from '../types';
 
 function TeamList({
   side,
@@ -47,6 +49,13 @@ export function WaitingRoom() {
   const players = useGameStore((s) => s.players);
   const setScreen = useGameStore((s) => s.setScreen);
   const [copyState, setCopyState] = useState<'IDLE' | 'COPIED' | 'FAILED'>('IDLE');
+
+  // Waiting for players is idle time: fetch the models now so the match starts without a load.
+  const gameType = session?.gameType;
+  useEffect(() => {
+    if (!gameType) return;
+    preloadVisionModels({ pose: true, face: isTugStyleGame(gameType) && isExpressionEnabled() });
+  }, [gameType]);
 
   useEffect(() => {
     if (copyState === 'IDLE') return;

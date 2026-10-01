@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useInputSender } from '../hooks/useInputSender';
 import { useMotionCapture } from '../hooks/useMotionCapture';
 import { isExpressionEnabled } from '../lib/preferences';
@@ -10,9 +10,16 @@ import { RopeTrack } from './ui/RopeTrack';
 
 /** Tunable: minimum expression score before a frame is worth capturing as a highlight. */
 const HIGHLIGHT_MIN_SCORE = 0.3;
+/**
+ * JPEG-encoding a frame blocks the main thread for several ms, and a rising grimace beats
+ * the previous best on almost every face frame - so capture at most this often.
+ */
+const HIGHLIGHT_CAPTURE_INTERVAL_MS = 500;
+
+let captureCanvas: HTMLCanvasElement | null = null;
 
 function captureFrame(video: HTMLVideoElement): string | null {
-  const canvas = document.createElement('canvas');
+  const canvas = (captureCanvas ??= document.createElement('canvas'));
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
@@ -29,12 +36,15 @@ export function PlayScreen() {
   const teamPower = useGameStore((s) => s.teamPower);
   const updateHighlight = useGameStore((s) => s.updateHighlight);
 
+  // Read once per mount: it's a localStorage read, and this component re-renders every frame.
+  const [expressionOn] = useState(isExpressionEnabled);
   const { videoRef, cameraState, motionScore, poseDetected, expressionScore } = useMotionCapture(true, {
-    expression: isExpressionEnabled(),
+    expression: expressionOn,
     bodyMovement: false,
     gesture: false,
   });
   const bestLocalHighlightRef = useRef(0);
+  const lastCaptureAtRef = useRef(0);
 
   useInputSender(session, () => ({ motionScore, expressionScore }));
 
@@ -42,6 +52,9 @@ export function PlayScreen() {
     if (expressionScore < HIGHLIGHT_MIN_SCORE || expressionScore <= bestLocalHighlightRef.current) return;
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
+    const now = performance.now();
+    if (now - lastCaptureAtRef.current < HIGHLIGHT_CAPTURE_INTERVAL_MS) return;
+    lastCaptureAtRef.current = now;
     bestLocalHighlightRef.current = expressionScore;
     const dataUrl = captureFrame(video);
     if (dataUrl) updateHighlight(expressionScore, dataUrl);

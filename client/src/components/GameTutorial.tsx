@@ -140,6 +140,10 @@ export function GameTutorial() {
 
   const { videoRef, cameraState, motionScore, bodyMovementScore, gesture, poseDetected } = useMotionCapture(true, {
     expression: false,
+    // Only the score this game's demo reads - each enabled tracker is a setState per camera frame.
+    motion: isTugStyle,
+    bodyMovement: isFreezeTag,
+    gesture: isSimonSays,
   });
   const motionScoreRef = useLatestRef(motionScore);
 

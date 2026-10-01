@@ -14,7 +14,9 @@ import { getMiniGame } from './games/registry.js';
 import { logger } from './logger.js';
 
 function broadcastState(io: Server, room: Room): void {
-  io.to(room.id).emit('game:state', {
+  // volatile: each tick fully supersedes the last, so a client whose connection can't keep up
+  // should just miss frames rather than have a backlog of stale state buffered for it.
+  io.to(room.id).volatile.emit('game:state', {
     tick: Date.now(),
     ...getMiniGame(room.gameType).broadcastPayload(room),
     roundNumber: room.roundNumber,

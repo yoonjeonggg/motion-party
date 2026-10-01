@@ -84,7 +84,9 @@ export function sendPower(
   motionScore: number,
   expressionScore = 0,
 ) {
-  socket.emit('input:power', { roomId, playerId, motionScore, expressionScore });
+  // volatile: if we're offline, drop it instead of buffering - a backlog of stale inputs flushed
+  // on reconnect is useless (and arrives before we've re-claimed our seat anyway).
+  socket.volatile.emit('input:power', { roomId, playerId, motionScore, expressionScore });
 }
 
 export function submitCalibration(roomId: string, playerId: string, baseline: number) {

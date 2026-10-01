@@ -1,4 +1,3 @@
-import { FaceLandmarker, FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState } from 'react';
 import { ExpressionScoreTracker, rawExpressionIntensity } from '../lib/expressionScore';
 import { BodyMovementTracker, MotionScoreTracker } from '../lib/motionScore';
@@ -51,22 +50,40 @@ interface UseMotionCaptureResult {
   endCalibration: () => number;
 }
 
-type WasmFileset = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
+type Vision = typeof import('@mediapipe/tasks-vision');
+type WasmFileset = Awaited<ReturnType<Vision['FilesetResolver']['forVisionTasks']>>;
 type Delegate = 'GPU' | 'CPU';
+
+/**
+ * The MediaPipe JS (~150KB) is loaded on demand so the lobby/onboarding text renders
+ * without waiting for it; the WASM fileset is resolved once and shared by both models.
+ */
+let filesetPromise: Promise<{ vision: Vision; fileset: WasmFileset }> | null = null;
+function loadFileset() {
+  filesetPromise ??= import('@mediapipe/tasks-vision')
+    .then(async (vision) => ({ vision, fileset: await vision.FilesetResolver.forVisionTasks(WASM_BASE) }))
+    .catch((err: unknown) => {
+      filesetPromise = null;
+      throw err;
+    });
+  return filesetPromise;
+}
 
 /**
  * Lazily creates one shared landmarker per model, preferring the GPU delegate.
  * Some mobile browsers reject a WebGL-backed delegate (driver/memory quirks) - CPU still works, just slower.
  */
-function sharedLandmarker<T>(create: (fileset: WasmFileset, delegate: Delegate) => Promise<T>): () => Promise<T> {
+function sharedLandmarker<T>(
+  create: (vision: Vision, fileset: WasmFileset, delegate: Delegate) => Promise<T>,
+): () => Promise<T> {
   let promise: Promise<T> | null = null;
   return () => {
-    promise ??= FilesetResolver.forVisionTasks(WASM_BASE)
-      .then(async (fileset) => {
+    promise ??= loadFileset()
+      .then(async ({ vision, fileset }) => {
         try {
-          return await create(fileset, 'GPU');
+          return await create(vision, fileset, 'GPU');
         } catch {
-          return create(fileset, 'CPU');
+          return create(vision, fileset, 'CPU');
         }
       })
       .catch((err: unknown) => {
@@ -78,22 +95,43 @@ function sharedLandmarker<T>(create: (fileset: WasmFileset, delegate: Delegate) 
   };
 }
 
-const getPoseLandmarker = sharedLandmarker((fileset, delegate) =>
-  PoseLandmarker.createFromOptions(fileset, {
+const getPoseLandmarker = sharedLandmarker((vision, fileset, delegate) =>
+  vision.PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate },
     runningMode: 'VIDEO',
     numPoses: 1,
   }),
 );
 
-const getFaceLandmarker = sharedLandmarker((fileset, delegate) =>
-  FaceLandmarker.createFromOptions(fileset, {
+const getFaceLandmarker = sharedLandmarker((vision, fileset, delegate) =>
+  vision.FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
     runningMode: 'VIDEO',
     numFaces: 1,
     outputFaceBlendshapes: true,
   }),
 );
+
+/**
+ * Starts downloading/compiling the models in the background (e.g. while sitting in the
+ * waiting room), so the play screen's camera is ready as soon as the match starts.
+ * Failures are ignored here - the screen that actually needs the model retries and reports it.
+ */
+export function preloadVisionModels({ pose = true, face = false }: { pose?: boolean; face?: boolean } = {}): void {
+  if (pose) getPoseLandmarker().catch(() => {});
+  if (face) getFaceLandmarker().catch(() => {});
+}
+
+/**
+ * The calibrated neutral-face baseline outlives the Calibration screen's hook instance,
+ * so the play screen's tracker (a separate instance) scores relative to it too.
+ */
+let calibratedBaseline = 0;
+
+/** Scores only drive gauges/percentages, so 0.01 steps are invisible - and let React skip identical re-renders. */
+function quantize(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 export function useMotionCapture(
   active: boolean,
@@ -131,6 +169,14 @@ export function useMotionCapture(
 
     async function start() {
       setCameraState('REQUESTING');
+      // Fetch/compile the models while the camera permission prompt and stream start-up are
+      // in flight, instead of only after them. The catch() just keeps an early model failure
+      // from surfacing as an unhandled rejection before we await it below.
+      const modelsPromise = Promise.all([
+        usePose ? getPoseLandmarker() : Promise.resolve(null),
+        useExpression ? getFaceLandmarker() : Promise.resolve(null),
+      ]);
+      modelsPromise.catch(() => {});
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           // `ideal` (not exact) so phones whose front camera doesn't support 640x480
@@ -148,15 +194,13 @@ export function useMotionCapture(
         video.srcObject = stream;
         await video.play();
 
-        const [poseLandmarker, faceLandmarker] = await Promise.all([
-          usePose ? getPoseLandmarker() : Promise.resolve(null),
-          useExpression ? getFaceLandmarker() : Promise.resolve(null),
-        ]);
+        const [poseLandmarker, faceLandmarker] = await modelsPromise;
         if (cancelled) return;
         setCameraState('READY');
         motionTrackerRef.current.reset();
         bodyTrackerRef.current.reset();
         expressionTrackerRef.current.reset();
+        expressionTrackerRef.current.setBaseline(calibratedBaseline);
         frameIndexRef.current = 0;
 
         const loop = (time: number) => {
@@ -172,8 +216,8 @@ export function useMotionCapture(
                 const landmarks = poseResult.landmarks[0] ?? null;
                 // Only track/setState the scores this caller actually reads - each
                 // setState is a re-render, and most screens only need one of the three.
-                if (useMotion) setMotionScore(motionTrackerRef.current.update(landmarks));
-                if (useBodyMovement) setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
+                if (useMotion) setMotionScore(quantize(motionTrackerRef.current.update(landmarks)));
+                if (useBodyMovement) setBodyMovementScore(quantize(bodyTrackerRef.current.update(landmarks)));
                 if (useGesture) setGesture(classifyGesture(landmarks));
                 if (poseDetectedRef.current !== Boolean(landmarks)) {
                   poseDetectedRef.current = Boolean(landmarks);
@@ -193,7 +237,7 @@ export function useMotionCapture(
                 if (calibratingRef.current) {
                   if (raw !== null) calibrationSamplesRef.current.push(raw);
                 } else {
-                  setExpressionScore(expressionTrackerRef.current.update(raw));
+                  setExpressionScore(quantize(expressionTrackerRef.current.update(raw)));
                 }
               }
             } catch (err) {
@@ -237,6 +281,7 @@ export function useMotionCapture(
     const samples = calibrationSamplesRef.current;
     const baseline = samples.length === 0 ? 0 : samples.reduce((sum, v) => sum + v, 0) / samples.length;
     expressionTrackerRef.current.setBaseline(baseline);
+    calibratedBaseline = baseline;
     return baseline;
   }
 

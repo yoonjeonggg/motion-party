@@ -6,10 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>모션파티</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <!-- Non-blocking: render immediately with the system font, swap in Wanted Sans once it arrives. -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.1/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.1/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

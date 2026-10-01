@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { clearStoredSession, storeSession } from '../lib/preferences';
+import { clearStoredSession, hasOnboarded, storeSession } from '../lib/preferences';
 import type {
   FreezeTagPhase,
   GameStatePayload,
@@ -87,7 +87,9 @@ const initialGameFields = {
 };
 
 export const useGameStore = create<GameStore>((set) => ({
-  screen: 'ONBOARDING',
+  // Decided up front (not in an effect after first paint): briefly mounting the onboarding
+  // screen for returning players would request the camera and start loading MediaPipe.
+  screen: hasOnboarded() ? 'LOBBY' : 'ONBOARDING',
   nickname: '',
   session: null,
   error: null,
