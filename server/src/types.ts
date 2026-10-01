@@ -9,6 +9,11 @@ export type RoomStatus =
 
 export type Side = 'A' | 'B';
 export type RoomMode = '1v1' | '2v2' | '4v4';
+export type MatchEndReason = 'ROUND_WINS' | 'DISCONNECT';
+/** Statuses a disconnect can pause (a round in progress, or the break between rounds). */
+export type PausableStatus = 'PLAYING' | 'ROUND_RESULT';
+
+export const SIDES: readonly Side[] = ['A', 'B'];
 
 export function opposite(side: Side): Side {
   return side === 'A' ? 'B' : 'A';
@@ -45,6 +50,11 @@ export interface Room {
   roundNumber: number;
   roundWins: Record<Side, number>;
   roundStartedAt: number;
+  /**
+   * Set while PAUSED for a disconnect: when the pause began (to exclude paused time from the
+   * round clock) and which status to go back to on resume. Null while not paused.
+   */
+  pause: { at: number; resumeTo: PausableStatus } | null;
   /** Opaque per-round state owned and shaped by the active MiniGameModule (see FN-12). */
   gameState: unknown;
   loopHandle: ReturnType<typeof setInterval> | null;
@@ -72,34 +82,10 @@ export interface PublicPlayer {
   calibrated: boolean;
 }
 
+// Match-wide timing shared by every minigame. Per-game tuning lives next to each
+// game's module in server/src/games.
 export const TICK_RATE_MS = 1000 / 18;
 export const ROUND_TIME_LIMIT_MS = 30_000;
 export const ROUND_RESULT_DELAY_MS = 3_000;
 export const RECONNECT_GRACE_MS = 30_000;
-export const ROPE_LIMIT = 1;
-export const ROPE_SPEED = 0.35;
-/** Arm-wrestling resolves faster than tug-of-war: shorter reach, quicker push, shorter time limit. */
-export const ARM_WRESTLE_LIMIT = 1;
-export const ARM_WRESTLE_SPEED = 0.5;
-export const ARM_WRESTLE_TIME_LIMIT_MS = 20_000;
 export const WINS_NEEDED = 2;
-/** Tunable: max multiplicative bonus (e.g. 0.3 = +30%) when 2v2 teammates' power is perfectly in sync. */
-export const SYNC_MAX_BONUS = 0.3;
-
-// 얼음땡 (freeze tag)
-export const FREEZE_TAG_MOVE_PHASE_MS = 4_000;
-export const FREEZE_TAG_FREEZE_PHASE_MS = 2_500;
-export const FREEZE_TAG_TIME_LIMIT_MS = 30_000;
-/** A side is "caught" if any of its players' body-movement score exceeds this during FREEZE. */
-export const FREEZE_TAG_MOVE_THRESHOLD = 0.12;
-
-// 동작 따라하기 (simon says)
-export const SIMON_SAYS_CUE_DURATION_MS = 2_500;
-export const SIMON_SAYS_TIME_LIMIT_MS = 30_000;
-/**
- * Upper-body-only gesture set (shoulders/wrists), matching client/src/lib/poseGesture.ts's
- * SIMON_SAYS_GESTURES. Kept in sync manually - the server only needs the ids to pick a cue,
- * the client owns classifying landmarks into them and the Korean labels shown in the UI.
- */
-export const SIMON_SAYS_GESTURES = ['LEFT_ARM_UP', 'RIGHT_ARM_UP', 'BOTH_ARMS_UP', 'ARMS_OUT'] as const;
-export type SimonSaysGesture = (typeof SIMON_SAYS_GESTURES)[number];

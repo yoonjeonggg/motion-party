@@ -1,5 +1,5 @@
-import { requestRematch } from '../hooks/useGameSocket';
-import { socket } from '../lib/socket';
+import { exitRoom, requestRematch } from '../hooks/useGameSocket';
+import { sideLabel } from '../lib/teams';
 import { useGameStore } from '../store/gameStore';
 
 export function MatchResult() {
@@ -8,22 +8,15 @@ export function MatchResult() {
   const session = useGameStore((s) => s.session);
   const highlight = useGameStore((s) => s.highlight);
   const resetMatch = useGameStore((s) => s.resetMatch);
-  const leaveRoom = useGameStore((s) => s.leaveRoom);
 
   if (!matchEnd || !session) return null;
 
-  const winners = players.filter((p) => p.side === matchEnd.winner);
-  const winnerLabel = winners.length > 0 ? winners.map((p) => p.nickname).join(' · ') : matchEnd.winner;
+  const { roomId } = session;
+  const winnerLabel = sideLabel(players, matchEnd.winner);
 
   function handleRematch() {
-    requestRematch(session!.roomId);
+    requestRematch(roomId);
     resetMatch();
-  }
-
-  function handleExit() {
-    socket.disconnect();
-    socket.connect();
-    leaveRoom();
   }
 
   return (
@@ -52,7 +45,7 @@ export function MatchResult() {
           <button type="button" className="primary" onClick={handleRematch}>
             다시하기
           </button>
-          <button type="button" onClick={handleExit}>
+          <button type="button" onClick={exitRoom}>
             나가기
           </button>
         </div>

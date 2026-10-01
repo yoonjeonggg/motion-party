@@ -1,11 +1,8 @@
-import {
-  effectivePower,
-  SYNC_MAX_BONUS,
-  TICK_RATE_MS,
-  type Room,
-  type Side,
-} from '../types.js';
+import { effectivePower, TICK_RATE_MS, type Room, type Side } from '../types.js';
 import { playersBySide, type MiniGameModule, type TickResult } from './miniGame.js';
+
+/** Tunable: max multiplicative bonus (e.g. 0.3 = +30%) when teammates' power is perfectly in sync. */
+export const SYNC_MAX_BONUS = 0.3;
 
 /**
  * Combined power for a side. In 2v2/4v4, teammates whose power is closely in sync
@@ -28,6 +25,12 @@ interface TugStyleState {
   power: Record<Side, number>;
   /** This tick's instantaneous side power, cached by tick() so broadcastPayload doesn't recompute it. */
   currentPower: Record<Side, number>;
+}
+
+/** More accumulated power wins; an exact tie goes to whichever side the position currently leans toward. */
+function timeUpWinner(state: TugStyleState): Side {
+  if (state.power.A !== state.power.B) return state.power.A > state.power.B ? 'A' : 'B';
+  return state.position >= 0 ? 'A' : 'B';
 }
 
 export interface TugStyleOptions {
@@ -53,7 +56,7 @@ export function createTugStyleModule(options: TugStyleOptions): MiniGameModule {
       position: 0,
       power: { A: 0, B: 0 },
       currentPower: { A: 0, B: 0 },
-    } as TugStyleState;
+    } satisfies TugStyleState;
   }
 
   function tick(room: Room): TickResult {
@@ -71,17 +74,8 @@ export function createTugStyleModule(options: TugStyleOptions): MiniGameModule {
     if (state.position >= options.limit) return { ended: true, winner: 'A' };
     if (state.position <= -options.limit) return { ended: true, winner: 'B' };
 
-    const elapsed = Date.now() - room.roundStartedAt;
-    if (elapsed >= options.timeLimitMs) {
-      const winner: Side =
-        state.power.A === state.power.B
-          ? state.position >= 0
-            ? 'A'
-            : 'B'
-          : state.power.A > state.power.B
-            ? 'A'
-            : 'B';
-      return { ended: true, winner };
+    if (Date.now() - room.roundStartedAt >= options.timeLimitMs) {
+      return { ended: true, winner: timeUpWinner(state) };
     }
 
     return { ended: false };

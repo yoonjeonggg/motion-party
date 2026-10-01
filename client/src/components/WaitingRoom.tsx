@@ -1,19 +1,27 @@
 import { useState } from 'react';
-import { socket } from '../lib/socket';
+import { exitRoom } from '../hooks/useGameSocket';
 import { useGameStore } from '../store/gameStore';
-import { MODE_LABELS, roomCapacity, type GameType } from '../types';
+import { GAME_LABELS, MODE_LABELS, roomCapacity, SIDES, type PublicPlayer, type Side } from '../types';
 
-const GAME_LABELS: Record<GameType, string> = {
-  tug_of_war: '줄다리기',
-  arm_wrestle: '팔씨름',
-  freeze_tag: '얼음땡',
-  simon_says: '동작 따라하기',
-};
+function TeamList({ side, players }: { side: Side; players: PublicPlayer[] }) {
+  return (
+    <ul className="player-list">
+      {players
+        .filter((p) => p.side === side)
+        .map((p) => (
+          <li key={p.id}>
+            <span className={`badge side-${side}`}>{side}</span>
+            {p.nickname}
+            {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
+          </li>
+        ))}
+    </ul>
+  );
+}
 
 export function WaitingRoom() {
   const session = useGameStore((s) => s.session);
   const players = useGameStore((s) => s.players);
-  const leaveRoom = useGameStore((s) => s.leaveRoom);
   const setScreen = useGameStore((s) => s.setScreen);
   const [copied, setCopied] = useState(false);
 
@@ -29,16 +37,8 @@ export function WaitingRoom() {
     }
   }
 
-  function handleLeave() {
-    socket.disconnect();
-    socket.connect();
-    leaveRoom();
-  }
-
   const capacity = roomCapacity(session.mode);
   const full = players.length >= capacity;
-  const teamA = players.filter((p) => p.side === 'A');
-  const teamB = players.filter((p) => p.side === 'B');
 
   return (
     <section className="screen waiting">
@@ -57,30 +57,18 @@ export function WaitingRoom() {
         </p>
 
         <div className="team-columns">
-          <ul className="player-list">
-            {teamA.map((p) => (
-              <li key={p.id}>
-                <span className="badge side-A">A</span>
-                {p.nickname}
-                {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
-              </li>
-            ))}
-          </ul>
-          <ul className="player-list">
-            {teamB.map((p) => (
-              <li key={p.id}>
-                <span className="badge side-B">B</span>
-                {p.nickname}
-                {p.connectionStatus === 'DISCONNECTED' && ' (연결 끊김)'}
-              </li>
-            ))}
-          </ul>
+          {SIDES.map((side) => (
+            <TeamList key={side} side={side} players={players} />
+          ))}
         </div>
 
-        {!full && <p className="hint">상대방을 기다리는 중...</p>}
-        {full && <p className="feedback">양쪽 준비 완료! 곧 시작해요...</p>}
+        {full ? (
+          <p className="feedback">양쪽 준비 완료! 곧 시작해요...</p>
+        ) : (
+          <p className="hint">상대방을 기다리는 중...</p>
+        )}
 
-        <button type="button" onClick={handleLeave}>
+        <button type="button" onClick={exitRoom}>
           나가기
         </button>
       </div>

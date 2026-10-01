@@ -1,3 +1,4 @@
+import { sideLabel } from '../lib/teams';
 import { useGameStore } from '../store/gameStore';
 
 export function RoundResult() {
@@ -6,8 +7,7 @@ export function RoundResult() {
 
   if (!lastRoundEnd) return null;
 
-  const winners = players.filter((p) => p.side === lastRoundEnd.winner);
-  const winnerLabel = winners.length > 0 ? winners.map((p) => p.nickname).join(' · ') : lastRoundEnd.winner;
+  const winnerLabel = sideLabel(players, lastRoundEnd.winner);
 
   return (
     <section className="screen round-result">

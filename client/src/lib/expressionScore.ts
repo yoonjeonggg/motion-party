@@ -1,3 +1,5 @@
+import { clamp01, SmoothedScore } from './smoothing';
+
 interface BlendshapeCategory {
   categoryName: string;
   score: number;
@@ -25,15 +27,12 @@ export function rawExpressionIntensity(categories: BlendshapeCategory[] | undefi
     const weight = EXPRESSION_WEIGHTS[c.categoryName];
     if (weight) sum += weight * c.score;
   }
-  return Math.max(0, Math.min(1, sum / WEIGHT_SUM));
+  return clamp01(sum / WEIGHT_SUM);
 }
-
-/** Smoothing factor for the exponential moving average applied to the final score. */
-const SCORE_SMOOTHING = 0.35;
 
 export class ExpressionScoreTracker {
   baseline = 0;
-  private smoothedScore = 0;
+  private score = new SmoothedScore();
 
   setBaseline(value: number): void {
     this.baseline = value;
@@ -41,13 +40,11 @@ export class ExpressionScoreTracker {
 
   /** Baseline-relative expression score for this frame (0~1), smoothed. */
   update(raw: number | null): number {
-    const target = raw === null ? 0 : Math.max(0, Math.min(1, raw - this.baseline));
-    this.smoothedScore += (target - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
+    return this.score.push(raw === null ? 0 : clamp01(raw - this.baseline));
   }
 
   reset(): void {
-    this.smoothedScore = 0;
+    this.score.reset();
     this.baseline = 0;
   }
 }

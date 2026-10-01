@@ -1,13 +1,13 @@
 import { create } from 'zustand';
+import { clearStoredSession, storeSession } from '../lib/preferences';
 import type {
   FreezeTagPhase,
   GameStatePayload,
-  GameType,
   MatchEndPayload,
   PublicPlayer,
-  RoomMode,
   RoundEndPayload,
   RoomStatus,
+  SessionPayload,
   Side,
 } from '../types';
 
@@ -21,14 +21,7 @@ export type Screen =
   | 'ROUND_RESULT'
   | 'MATCH_RESULT';
 
-export interface SessionInfo {
-  roomId: string;
-  code: string;
-  playerId: string;
-  side: Side;
-  mode: RoomMode;
-  gameType: GameType;
-}
+export type SessionInfo = SessionPayload;
 
 export interface Highlight {
   score: number;
@@ -102,7 +95,7 @@ export const useGameStore = create<GameStore>((set) => ({
   setError: (message) => set({ error: message }),
 
   applySession: (session) => {
-    localStorage.setItem('motionparty:session', JSON.stringify(session));
+    storeSession(session);
     set({ session, screen: 'WAITING', error: null });
   },
 
@@ -156,17 +149,7 @@ export const useGameStore = create<GameStore>((set) => ({
   resetMatch: () => set({ ...initialGameFields, screen: 'WAITING' }),
 
   leaveRoom: () => {
-    localStorage.removeItem('motionparty:session');
+    clearStoredSession();
     set({ session: null, screen: 'LOBBY', ...initialGameFields });
   },
 }));
-
-export function loadStoredSession(): SessionInfo | null {
-  try {
-    const raw = localStorage.getItem('motionparty:session');
-    if (!raw) return null;
-    return JSON.parse(raw) as SessionInfo;
-  } catch {
-    return null;
-  }
-}

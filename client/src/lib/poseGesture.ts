@@ -1,10 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { SCORE_SMOOTHING } from './motionScore';
-
-const LEFT_SHOULDER = 11;
-const RIGHT_SHOULDER = 12;
-const LEFT_WRIST = 15;
-const RIGHT_WRIST = 16;
+import { POSE } from './landmarks';
+import { SmoothedScore } from './smoothing';
 
 export type Gesture = 'LEFT_ARM_UP' | 'RIGHT_ARM_UP' | 'BOTH_ARMS_UP' | 'ARMS_OUT' | 'REST';
 
@@ -22,10 +18,10 @@ const OUT_X_MARGIN = 0.18;
  */
 export function classifyGesture(landmarks: NormalizedLandmark[] | null): Gesture {
   if (!landmarks) return 'REST';
-  const ls = landmarks[LEFT_SHOULDER];
-  const rs = landmarks[RIGHT_SHOULDER];
-  const lw = landmarks[LEFT_WRIST];
-  const rw = landmarks[RIGHT_WRIST];
+  const ls = landmarks[POSE.LEFT_SHOULDER];
+  const rs = landmarks[POSE.RIGHT_SHOULDER];
+  const lw = landmarks[POSE.LEFT_WRIST];
+  const rw = landmarks[POSE.RIGHT_WRIST];
   if (!ls || !rs || !lw || !rw) return 'REST';
 
   const leftUp = lw.y < ls.y - RAISE_MARGIN;
@@ -50,7 +46,10 @@ export const GESTURE_LABELS: Record<Gesture, string> = {
   REST: '차렷',
 };
 
-/** Cue targets the game rotates through; REST is only ever a fallback classification, never a cue. */
+/**
+ * Cue targets the game rotates through; REST is only ever a fallback classification, never a cue.
+ * Mirrors server/src/games/simonSays.ts's GESTURES - kept in sync manually.
+ */
 export const SIMON_SAYS_GESTURES = [
   'LEFT_ARM_UP',
   'RIGHT_ARM_UP',
@@ -60,15 +59,17 @@ export const SIMON_SAYS_GESTURES = [
 
 /** Smooths the instant "does my gesture match the cue right now" bit into a 0..1 score, like the other trackers. */
 export class GestureMatchTracker {
-  private smoothedScore = 0;
+  private score = new SmoothedScore();
 
   update(matched: boolean): number {
-    const raw = matched ? 1 : 0;
-    this.smoothedScore += (raw - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
+    return this.score.push(matched ? 1 : 0);
   }
 
   reset(): void {
-    this.smoothedScore = 0;
+    this.score.reset();
   }
+}
+
+export function isGesture(value: string): value is Gesture {
+  return value in GESTURE_LABELS;
 }

@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLatch } from '../hooks/useLatch';
+import { useLatestRef } from '../hooks/useLatestRef';
 import { useMotionCapture } from '../hooks/useMotionCapture';
+import { hasOnboarded, markOnboarded } from '../lib/preferences';
+import { clamp01 } from '../lib/smoothing';
 import { useGameStore } from '../store/gameStore';
+import { Gauge } from './ui/Gauge';
+import { RopeTrack } from './ui/RopeTrack';
 
-const ALREADY_DONE_KEY = 'motionparty:onboarded';
+/** Mirrors the server's tug-of-war tuning (server/src/games/tugOfWar.ts) so practice feels like a real match. */
 const ROPE_SPEED = 0.35;
 const ROPE_LIMIT = 1;
 const PRACTICE_RAMP_MS = 15_000;
 const PRACTICE_TIME_LIMIT_MS = 20_000;
+const PULL_THRESHOLD = 0.5;
 const EXPRESSION_DEMO_THRESHOLD = 0.15;
 
 type Step = 'DEMO' | 'EXPRESSION_DEMO' | 'RULES' | 'PRACTICE';
@@ -14,7 +21,7 @@ type Step = 'DEMO' | 'EXPRESSION_DEMO' | 'RULES' | 'PRACTICE';
 function dummyPower(elapsedMs: number): number {
   const ramp = Math.min(elapsedMs / PRACTICE_RAMP_MS, 1);
   const noise = Math.sin(elapsedMs / 300) * 0.05;
-  return Math.max(0, Math.min(1, 0.25 + ramp * 0.5 + noise));
+  return clamp01(0.25 + ramp * 0.5 + noise);
 }
 
 export function Tutorial() {
@@ -25,73 +32,46 @@ export function Tutorial() {
   });
 
   const [step, setStep] = useState<Step>('DEMO');
-  const [reachedThreshold, setReachedThreshold] = useState(false);
-  const reachedRef = useRef(false);
-  const [expressionBonusShown, setExpressionBonusShown] = useState(false);
-  const expressionBonusRef = useRef(false);
-  const isReplay = useRef(hasOnboarded());
+  const reachedThreshold = useLatch(motionScore >= PULL_THRESHOLD);
+  const expressionBonusShown = useLatch(step === 'EXPRESSION_DEMO' && expressionScore >= EXPRESSION_DEMO_THRESHOLD);
+  const [isReplay] = useState(hasOnboarded);
 
   // Practice round state
   const [ropePosition, setRopePosition] = useState(0);
   const [dummyScore, setDummyScore] = useState(0);
   const [practiceDone, setPracticeDone] = useState(false);
-  const scoreRef = useRef(0);
-  scoreRef.current = motionScore;
-  const practiceRafRef = useRef<number | null>(null);
-  const practiceStartRef = useRef(0);
-  const lastFrameRef = useRef(0);
-  const positionRef = useRef(0);
-
-  useEffect(() => {
-    if (motionScore >= 0.5 && !reachedRef.current) {
-      reachedRef.current = true;
-      setReachedThreshold(true);
-    }
-  }, [motionScore]);
-
-  useEffect(() => {
-    if (step === 'EXPRESSION_DEMO' && expressionScore >= EXPRESSION_DEMO_THRESHOLD && !expressionBonusRef.current) {
-      expressionBonusRef.current = true;
-      setExpressionBonusShown(true);
-    }
-  }, [step, expressionScore]);
+  const scoreRef = useLatestRef(motionScore);
 
   useEffect(() => {
     if (step !== 'PRACTICE') return;
-    positionRef.current = 0;
-    practiceStartRef.current = performance.now();
-    lastFrameRef.current = practiceStartRef.current;
+    const startedAt = performance.now();
+    let lastFrame = startedAt;
+    let position = 0;
+    let raf = 0;
 
     const loop = (time: number) => {
-      const dt = (time - lastFrameRef.current) / 1000;
-      lastFrameRef.current = time;
-      const elapsed = time - practiceStartRef.current;
+      const dt = (time - lastFrame) / 1000;
+      lastFrame = time;
+      const elapsed = time - startedAt;
       const dummy = dummyPower(elapsed);
       setDummyScore(dummy);
 
-      const next = Math.max(
-        -ROPE_LIMIT,
-        Math.min(ROPE_LIMIT, positionRef.current + (scoreRef.current - dummy) * ROPE_SPEED * dt),
-      );
-      positionRef.current = next;
-      setRopePosition(next);
+      position = Math.max(-ROPE_LIMIT, Math.min(ROPE_LIMIT, position + (scoreRef.current - dummy) * ROPE_SPEED * dt));
+      setRopePosition(position);
 
-      if (Math.abs(next) >= ROPE_LIMIT || elapsed >= PRACTICE_TIME_LIMIT_MS) {
+      if (Math.abs(position) >= ROPE_LIMIT || elapsed >= PRACTICE_TIME_LIMIT_MS) {
         setPracticeDone(true);
         return;
       }
-      practiceRafRef.current = requestAnimationFrame(loop);
+      raf = requestAnimationFrame(loop);
     };
-    practiceRafRef.current = requestAnimationFrame(loop);
+    raf = requestAnimationFrame(loop);
 
-    return () => {
-      if (practiceRafRef.current) cancelAnimationFrame(practiceRafRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+    return () => cancelAnimationFrame(raf);
+  }, [step, scoreRef]);
 
   function finish() {
-    localStorage.setItem(ALREADY_DONE_KEY, '1');
+    markOnboarded();
     setScreen('LOBBY');
   }
 
@@ -101,14 +81,12 @@ export function Tutorial() {
     step === 'PRACTICE' ||
     (step === 'DEMO' && cameraState === 'READY');
 
-  const ropePercent = ((ropePosition + 1) / 2) * 100;
-
   return (
     <section className="screen tutorial">
       {showSkip && (
         <button
           type="button"
-          className={`skip-link${isReplay.current ? ' prominent' : ''}`}
+          className={`skip-link${isReplay ? ' prominent' : ''}`}
           onClick={finish}
         >
           건너뛰기
@@ -141,9 +119,7 @@ export function Tutorial() {
             <div className="card onboarding-demo">
               <video ref={videoRef} className="preview mirrored" muted playsInline />
               <p className="instruction">팔을 당겨보세요!</p>
-              <div className="gauge">
-                <div className="gauge-fill" style={{ width: `${Math.round(motionScore * 100)}%` }} />
-              </div>
+              <Gauge value={motionScore} />
               {reachedThreshold ? (
                 <>
                   <p className="feedback">좋아요! 이렇게 당기면 돼요 💪</p>
@@ -164,16 +140,9 @@ export function Tutorial() {
           <video ref={videoRef} className="preview mirrored" muted playsInline />
           <p className="instruction">이번엔 힘든 표정도 같이 지어보세요!</p>
           <p className="hint small">동작만 할 때</p>
-          <div className="gauge">
-            <div className="gauge-fill" style={{ width: `${Math.round(motionScore * 100)}%` }} />
-          </div>
+          <Gauge value={motionScore} />
           <p className="hint small">동작 + 표정</p>
-          <div className="gauge">
-            <div
-              className="gauge-fill opponent"
-              style={{ width: `${Math.round(Math.min(1, motionScore * (1 + expressionScore)) * 100)}%` }}
-            />
-          </div>
+          <Gauge value={motionScore * (1 + expressionScore)} alt />
           {expressionBonusShown ? (
             <>
               <p className="feedback">표정 보너스 +{Math.round(expressionScore * 100)}% 💥</p>
@@ -190,12 +159,7 @@ export function Tutorial() {
       {step === 'RULES' && (
         <div className="card">
           <p className="instruction">로프를 상대 쪽 끝까지 밀면 승리! 3판 2선승제예요.</p>
-          <div className="rope-track">
-            <div className="rope-zone zone-a" />
-            <div className="rope-zone zone-b" />
-            <div className="rope-marker" style={{ left: '50%' }} />
-            <div className="rope-center" />
-          </div>
+          <RopeTrack position={0} />
           <button type="button" className="primary" onClick={() => setStep('PRACTICE')}>
             이해했어요
           </button>
@@ -206,21 +170,14 @@ export function Tutorial() {
         <>
           <p className="sub">실전과 똑같이 연습해봐요!</p>
 
-          <div className="rope-track">
-            <div className="rope-zone zone-a" />
-            <div className="rope-zone zone-b" />
-            <div className="rope-marker" style={{ left: `${ropePercent}%` }} />
-            <div className="rope-center" />
-          </div>
+          <RopeTrack position={ropePosition} />
 
           <div className="players-row">
             <div className="player-panel">
               <video ref={videoRef} className="preview mirrored small" muted playsInline />
               <p className="player-name">나</p>
               {!poseDetected && <p className="hint small">카메라 각도를 조정해주세요</p>}
-              <div className="gauge">
-                <div className="gauge-fill" style={{ width: `${Math.round(motionScore * 100)}%` }} />
-              </div>
+              <Gauge value={motionScore} />
             </div>
 
             <div className="vs">VS</div>
@@ -228,12 +185,7 @@ export function Tutorial() {
             <div className="player-panel">
               <div className="preview small placeholder">더</div>
               <p className="player-name">연습 상대</p>
-              <div className="gauge">
-                <div
-                  className="gauge-fill opponent"
-                  style={{ width: `${Math.round(dummyScore * 100)}%` }}
-                />
-              </div>
+              <Gauge value={dummyScore} alt />
             </div>
           </div>
 
@@ -250,8 +202,4 @@ export function Tutorial() {
       )}
     </section>
   );
-}
-
-export function hasOnboarded(): boolean {
-  return localStorage.getItem(ALREADY_DONE_KEY) === '1';
 }

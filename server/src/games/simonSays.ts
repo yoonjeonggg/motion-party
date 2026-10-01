@@ -1,14 +1,18 @@
-import {
-  SIMON_SAYS_CUE_DURATION_MS,
-  SIMON_SAYS_GESTURES,
-  SIMON_SAYS_TIME_LIMIT_MS,
-  type Room,
-  type Side,
-  type SimonSaysGesture,
-} from '../types.js';
-import { playersBySide, type MiniGameModule, type TickResult } from './miniGame.js';
+import type { Room, Side } from '../types.js';
+import { accumulateMotionScores, leadingSide, type MiniGameModule, type TickResult } from './miniGame.js';
 
 export const SIMON_SAYS_ID = 'simon_says';
+
+const CUE_DURATION_MS = 2_500;
+const TIME_LIMIT_MS = 30_000;
+
+/**
+ * Upper-body-only gesture set (shoulders/wrists), matching client/src/lib/poseGesture.ts's
+ * SIMON_SAYS_GESTURES. Kept in sync manually - the server only needs the ids to pick a cue,
+ * the client owns classifying landmarks into them and the Korean labels shown in the UI.
+ */
+const GESTURES = ['LEFT_ARM_UP', 'RIGHT_ARM_UP', 'BOTH_ARMS_UP', 'ARMS_OUT'] as const;
+type SimonSaysGesture = (typeof GESTURES)[number];
 
 interface SimonSaysState {
   cue: SimonSaysGesture;
@@ -18,10 +22,9 @@ interface SimonSaysState {
 }
 
 function pickNextCue(current: SimonSaysGesture | null): SimonSaysGesture {
-  if (SIMON_SAYS_GESTURES.length <= 1) return SIMON_SAYS_GESTURES[0]!;
   let next: SimonSaysGesture;
   do {
-    next = SIMON_SAYS_GESTURES[Math.floor(Math.random() * SIMON_SAYS_GESTURES.length)]!;
+    next = GESTURES[Math.floor(Math.random() * GESTURES.length)]!;
   } while (next === current);
   return next;
 }
@@ -29,9 +32,9 @@ function pickNextCue(current: SimonSaysGesture | null): SimonSaysGesture {
 function resetRound(room: Room): void {
   room.gameState = {
     cue: pickNextCue(null),
-    cueEndsAt: Date.now() + SIMON_SAYS_CUE_DURATION_MS,
+    cueEndsAt: Date.now() + CUE_DURATION_MS,
     score: { A: 0, B: 0 },
-  } as SimonSaysState;
+  } satisfies SimonSaysState;
 }
 
 function tick(room: Room): TickResult {
@@ -40,21 +43,15 @@ function tick(room: Room): TickResult {
 
   if (now >= state.cueEndsAt) {
     state.cue = pickNextCue(state.cue);
-    state.cueEndsAt = now + SIMON_SAYS_CUE_DURATION_MS;
+    state.cueEndsAt = now + CUE_DURATION_MS;
   }
 
   // Client self-reports how well its detected gesture currently matches the cue via
   // the same motionScore input channel every other game uses (see FN-12 notes).
-  for (const side of ['A', 'B'] as Side[]) {
-    for (const player of playersBySide(room, side)) {
-      state.score[side] += player.motionScore;
-    }
-  }
+  accumulateMotionScores(room, state.score);
 
-  const elapsed = now - room.roundStartedAt;
-  if (elapsed >= SIMON_SAYS_TIME_LIMIT_MS) {
-    const winner: Side = state.score.A >= state.score.B ? 'A' : 'B';
-    return { ended: true, winner };
+  if (now - room.roundStartedAt >= TIME_LIMIT_MS) {
+    return { ended: true, winner: leadingSide(state.score) };
   }
 
   return { ended: false };
@@ -65,8 +62,12 @@ function broadcastPayload(room: Room): Record<string, unknown> {
   return {
     cue: state.cue,
     cueRemainingMs: Math.max(0, state.cueEndsAt - Date.now()),
-    teamPower: { A: state.score.A, B: state.score.B },
+    teamPower: { ...state.score },
   };
+}
+
+function shiftDeadlines(room: Room, ms: number): void {
+  (room.gameState as SimonSaysState).cueEndsAt += ms;
 }
 
 export const simonSaysModule: MiniGameModule = {
@@ -75,4 +76,5 @@ export const simonSaysModule: MiniGameModule = {
   resetRound,
   tick,
   broadcastPayload,
+  shiftDeadlines,
 };

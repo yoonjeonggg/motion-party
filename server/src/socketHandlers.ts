@@ -1,16 +1,17 @@
 import type { Server, Socket } from 'socket.io';
 import {
   createRoom,
+  destroyRoom,
   findRoomBySocketId,
   findRoomByPlayerId,
   joinRoom,
   markCalibrated,
+  resetRoomToLobby,
   toPublicPlayers,
 } from './roomManager.js';
 import {
-  backToLobby,
-  cleanupRoom,
   forfeitToRemainingPlayer,
+  isPausable,
   pauseForDisconnect,
   resumeAfterReconnect,
   tryStartMatch,
@@ -34,6 +35,27 @@ function on<T>(socket: Socket, event: string, handler: (payload: T) => void): vo
   });
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+/** Pushes the current roster and room status to everyone in the room. */
+function broadcastRoster(io: Server, room: Room): void {
+  io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+}
+
+/** What a client needs to remember about the room it just entered (room:created / room:joined). */
+function sessionPayload(room: Room, player: Player) {
+  return {
+    roomId: room.id,
+    code: room.code,
+    playerId: player.id,
+    side: player.side,
+    mode: room.mode,
+    gameType: room.gameType,
+  };
+}
+
 export function registerSocketHandlers(io: Server, socket: Socket): void {
   on<{ nickname: string; mode?: RoomMode; gameType?: string }>(
     socket,
@@ -45,15 +67,8 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
         { roomId: room.id, code: room.code, mode: room.mode, gameType: room.gameType, playerId: player.id },
         'room created',
       );
-      socket.emit('room:created', {
-        roomId: room.id,
-        code: room.code,
-        playerId: player.id,
-        side: player.side,
-        mode: room.mode,
-        gameType: room.gameType,
-      });
-      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+      socket.emit('room:created', sessionPayload(room, player));
+      broadcastRoster(io, room);
     },
   );
 
@@ -70,15 +85,8 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
       { roomId: room.id, code: room.code, playerId: player.id, side: player.side, playerCount: room.players.length },
       'player joined room',
     );
-    socket.emit('room:joined', {
-      roomId: room.id,
-      code: room.code,
-      playerId: player.id,
-      side: player.side,
-      mode: room.mode,
-      gameType: room.gameType,
-    });
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+    socket.emit('room:joined', sessionPayload(room, player));
+    broadcastRoster(io, room);
     tryStartMatch(io, room);
   });
 
@@ -89,8 +97,8 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
       const found = findRoomByPlayerId(roomId, playerId);
       if (!found) return;
       const { player } = found;
-      player.motionScore = Math.max(0, Math.min(1, motionScore));
-      player.expressionScore = Math.max(0, Math.min(1, expressionScore ?? 0));
+      player.motionScore = clamp01(motionScore);
+      player.expressionScore = clamp01(expressionScore ?? 0);
       player.lastInputAt = Date.now();
     },
   );
@@ -104,7 +112,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
       const { room } = found;
       const allDone = markCalibrated(room, playerId);
       logger.info({ roomId, playerId, allDone }, 'calibration submitted');
-      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+      broadcastRoster(io, room);
       if (allDone) tryStartMatch(io, room);
     },
   );
@@ -126,11 +134,11 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     socket.join(room.id);
     logger.info({ roomId, playerId }, 'player reconnected');
 
-    io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+    broadcastRoster(io, room);
     socket.emit('player:reconnect', { playerId: player.id, roomId: room.id, ok: true });
 
-    const opponentConnected = room.players.every((p) => p.connectionStatus === 'CONNECTED');
-    if (room.status === 'PAUSED' && opponentConnected) {
+    const everyoneConnected = room.players.every((p) => p.connectionStatus === 'CONNECTED');
+    if (room.status === 'PAUSED' && everyoneConnected) {
       resumeAfterReconnect(io, room);
     }
   });
@@ -138,10 +146,11 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
   on<{ roomId: string }>(socket, 'room:rematch', ({ roomId }) => {
     const found = findRoomBySocketId(socket.id);
     if (!found || found.room.id !== roomId) return;
-    backToLobby(found.room);
+    const { room } = found;
+    resetRoomToLobby(room);
     logger.info({ roomId }, 'room rematch requested');
-    io.to(roomId).emit('room:player_joined', { players: toPublicPlayers(found.room), status: found.room.status });
-    tryStartMatch(io, found.room);
+    broadcastRoster(io, room);
+    tryStartMatch(io, room);
   });
 
   on<void>(socket, 'disconnect', () => {
@@ -150,16 +159,20 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
     const { room, player } = found;
     player.connectionStatus = 'DISCONNECTED';
 
-    if (room.status === 'LOBBY' || room.status === 'CALIBRATING' || room.status === 'READY') {
+    // Not mid-match (before it starts, or after it's over): just leave the room, no forfeit timer.
+    if (!isPausable(room.status) && room.status !== 'PAUSED') {
+      const matchOver = room.status === 'MATCH_RESULT';
       room.players = room.players.filter((p) => p.id !== player.id);
-      logger.info({ roomId: room.id, playerId: player.id }, 'player left before match start');
+      logger.info({ roomId: room.id, playerId: player.id, matchOver }, 'player left room');
       if (room.players.length === 0) {
         logger.info({ roomId: room.id }, 'room emptied, cleaning up');
-        cleanupRoom(room.id);
+        destroyRoom(room.id);
         return;
       }
+      // After a finished match, clear the old scores so a refilled room starts a fresh match.
+      if (matchOver) resetRoomToLobby(room);
       room.status = 'LOBBY';
-      io.to(room.id).emit('room:player_joined', { players: toPublicPlayers(room), status: room.status });
+      broadcastRoster(io, room);
       return;
     }
 

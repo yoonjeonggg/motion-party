@@ -1,4 +1,4 @@
-import type { Player, Room, Side } from '../types.js';
+import { SIDES, type Player, type Room, type Side } from '../types.js';
 
 export interface TickResult {
   ended: boolean;
@@ -8,6 +8,20 @@ export interface TickResult {
 /** Shared by every minigame's tick/broadcast logic to split the roster by team. */
 export function playersBySide(room: Room, side: Side): Player[] {
   return room.players.filter((p) => p.side === side);
+}
+
+/** Adds every player's current motionScore into their side's running total. */
+export function accumulateMotionScores(room: Room, totals: Record<Side, number>): void {
+  for (const side of SIDES) {
+    for (const player of playersBySide(room, side)) {
+      totals[side] += player.motionScore;
+    }
+  }
+}
+
+/** Side with the higher total; A wins ties. */
+export function leadingSide(totals: Record<Side, number>): Side {
+  return totals.A >= totals.B ? 'A' : 'B';
 }
 
 /**
@@ -24,4 +38,6 @@ export interface MiniGameModule {
   tick(room: Room): TickResult;
   /** Game-specific fields merged into the `game:state` broadcast. */
   broadcastPayload(room: Room): Record<string, unknown>;
+  /** Push any absolute-time deadlines in gameState back by `ms`, so a pause doesn't eat into them. */
+  shiftDeadlines?(room: Room, ms: number): void;
 }

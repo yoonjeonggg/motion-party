@@ -51,54 +51,43 @@ interface UseMotionCaptureResult {
   endCalibration: () => number;
 }
 
-let sharedPosePromise: Promise<PoseLandmarker> | null = null;
-function getPoseLandmarker(): Promise<PoseLandmarker> {
-  if (!sharedPosePromise) {
-    sharedPosePromise = FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
-      const baseOptions = { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' as const };
+type WasmFileset = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
+type Delegate = 'GPU' | 'CPU';
+
+/**
+ * Lazily creates one shared landmarker per model, preferring the GPU delegate.
+ * Some mobile browsers reject a WebGL-backed delegate (driver/memory quirks) - CPU still works, just slower.
+ */
+function sharedLandmarker<T>(create: (fileset: WasmFileset, delegate: Delegate) => Promise<T>): () => Promise<T> {
+  let promise: Promise<T> | null = null;
+  return () => {
+    promise ??= FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
       try {
-        return await PoseLandmarker.createFromOptions(fileset, {
-          baseOptions,
-          runningMode: 'VIDEO',
-          numPoses: 1,
-        });
+        return await create(fileset, 'GPU');
       } catch {
-        // Some mobile browsers reject a WebGL-backed delegate (driver/memory quirks) - CPU still works, just slower.
-        return PoseLandmarker.createFromOptions(fileset, {
-          baseOptions: { ...baseOptions, delegate: 'CPU' },
-          runningMode: 'VIDEO',
-          numPoses: 1,
-        });
+        return create(fileset, 'CPU');
       }
     });
-  }
-  return sharedPosePromise;
+    return promise;
+  };
 }
 
-let sharedFacePromise: Promise<FaceLandmarker> | null = null;
-function getFaceLandmarker(): Promise<FaceLandmarker> {
-  if (!sharedFacePromise) {
-    sharedFacePromise = FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
-      const baseOptions = { modelAssetPath: FACE_MODEL_URL, delegate: 'GPU' as const };
-      try {
-        return await FaceLandmarker.createFromOptions(fileset, {
-          baseOptions,
-          runningMode: 'VIDEO',
-          numFaces: 1,
-          outputFaceBlendshapes: true,
-        });
-      } catch {
-        return FaceLandmarker.createFromOptions(fileset, {
-          baseOptions: { ...baseOptions, delegate: 'CPU' },
-          runningMode: 'VIDEO',
-          numFaces: 1,
-          outputFaceBlendshapes: true,
-        });
-      }
-    });
-  }
-  return sharedFacePromise;
-}
+const getPoseLandmarker = sharedLandmarker((fileset, delegate) =>
+  PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate },
+    runningMode: 'VIDEO',
+    numPoses: 1,
+  }),
+);
+
+const getFaceLandmarker = sharedLandmarker((fileset, delegate) =>
+  FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: FACE_MODEL_URL, delegate },
+    runningMode: 'VIDEO',
+    numFaces: 1,
+    outputFaceBlendshapes: true,
+  }),
+);
 
 export function useMotionCapture(
   active: boolean,

@@ -1,11 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
-
-const LEFT_SHOULDER = 11;
-const LEFT_ELBOW = 13;
-const LEFT_WRIST = 15;
-const RIGHT_SHOULDER = 12;
-const RIGHT_ELBOW = 14;
-const RIGHT_WRIST = 16;
+import { POSE } from './landmarks';
+import { clamp01, RollingAverage, SmoothedScore } from './smoothing';
 
 function angleAt(
   a: NormalizedLandmark,
@@ -25,12 +20,12 @@ function angleAt(
 }
 
 export function averageArmAngle(landmarks: NormalizedLandmark[]): number | null {
-  const ls = landmarks[LEFT_SHOULDER];
-  const le = landmarks[LEFT_ELBOW];
-  const lw = landmarks[LEFT_WRIST];
-  const rs = landmarks[RIGHT_SHOULDER];
-  const re = landmarks[RIGHT_ELBOW];
-  const rw = landmarks[RIGHT_WRIST];
+  const ls = landmarks[POSE.LEFT_SHOULDER];
+  const le = landmarks[POSE.LEFT_ELBOW];
+  const lw = landmarks[POSE.LEFT_WRIST];
+  const rs = landmarks[POSE.RIGHT_SHOULDER];
+  const re = landmarks[POSE.RIGHT_ELBOW];
+  const rw = landmarks[POSE.RIGHT_WRIST];
 
   const angles: number[] = [];
   if (ls && le && lw) angles.push(angleAt(ls, le, lw));
@@ -43,108 +38,87 @@ export function averageArmAngle(landmarks: NormalizedLandmark[]): number | null 
 export const MAX_ANGLE_DELTA = 0.55;
 /** Number of recent per-frame deltas averaged into the reported motion score. */
 export const DELTA_WINDOW = 10;
-/** Smoothing factor for the exponential moving average applied to the final score. */
-export const SCORE_SMOOTHING = 0.35;
 
+/** Arm-pull score for 줄다리기/팔씨름: how fast the elbow angle is changing, frame to frame. */
 export class MotionScoreTracker {
   private previousAngle: number | null = null;
-  private deltaBuffer: number[] = [];
-  private smoothedScore = 0;
+  private deltas = new RollingAverage(DELTA_WINDOW);
+  private score = new SmoothedScore();
 
   update(landmarks: NormalizedLandmark[] | null): number {
-    if (!landmarks) {
-      this.previousAngle = null;
-      return this.decay();
-    }
-
-    const angle = averageArmAngle(landmarks);
+    const angle = landmarks ? averageArmAngle(landmarks) : null;
     if (angle === null) {
       this.previousAngle = null;
-      return this.decay();
+      return this.score.decay();
     }
 
-    if (this.previousAngle !== null) {
-      const delta = Math.abs(angle - this.previousAngle);
-      this.deltaBuffer.push(delta);
-      if (this.deltaBuffer.length > DELTA_WINDOW) this.deltaBuffer.shift();
-    }
+    if (this.previousAngle !== null) this.deltas.push(Math.abs(angle - this.previousAngle));
     this.previousAngle = angle;
 
-    const avgDelta =
-      this.deltaBuffer.length === 0
-        ? 0
-        : this.deltaBuffer.reduce((sum, d) => sum + d, 0) / this.deltaBuffer.length;
-
-    const rawScore = Math.max(0, Math.min(1, avgDelta / MAX_ANGLE_DELTA));
-    this.smoothedScore += (rawScore - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
-  }
-
-  private decay(): number {
-    this.smoothedScore += (0 - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
+    return this.score.push(clamp01(this.deltas.average / MAX_ANGLE_DELTA));
   }
 
   reset(): void {
     this.previousAngle = null;
-    this.deltaBuffer = [];
-    this.smoothedScore = 0;
+    this.deltas.reset();
+    this.score.reset();
   }
 }
 
-/** Landmark indices sampled for whole-body movement: nose, shoulders, wrists, hips, ankles. */
-const BODY_TRACKED_INDICES = [0, 11, 12, 15, 16, 23, 24, 27, 28];
+/** Landmarks sampled for whole-body movement: nose, shoulders, wrists, hips, ankles. */
+const BODY_TRACKED_INDICES = [
+  POSE.NOSE,
+  POSE.LEFT_SHOULDER,
+  POSE.RIGHT_SHOULDER,
+  POSE.LEFT_WRIST,
+  POSE.RIGHT_WRIST,
+  POSE.LEFT_HIP,
+  POSE.RIGHT_HIP,
+  POSE.LEFT_ANKLE,
+  POSE.RIGHT_ANKLE,
+];
 /** Tunable: average per-frame normalized landmark displacement that counts as "moving a lot". */
 export const MAX_BODY_DELTA = 0.05;
+
+/** Average displacement of the tracked landmarks visible in both frames, or null if none are. */
+function averageDisplacement(current: NormalizedLandmark[], previous: NormalizedLandmark[]): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const i of BODY_TRACKED_INDICES) {
+    const cur = current[i];
+    const prev = previous[i];
+    if (cur && prev) {
+      sum += Math.hypot(cur.x - prev.x, cur.y - prev.y);
+      count += 1;
+    }
+  }
+  return count > 0 ? sum / count : null;
+}
 
 /** Whole-body movement score for 얼음땡 (freeze tag) - unlike MotionScoreTracker, not limited to arm angle. */
 export class BodyMovementTracker {
   private previous: NormalizedLandmark[] | null = null;
-  private deltaBuffer: number[] = [];
-  private smoothedScore = 0;
+  private deltas = new RollingAverage(DELTA_WINDOW);
+  private score = new SmoothedScore();
 
   update(landmarks: NormalizedLandmark[] | null): number {
     if (!landmarks) {
       this.previous = null;
-      return this.decay();
+      return this.score.decay();
     }
 
     if (this.previous) {
-      let sum = 0;
-      let count = 0;
-      for (const i of BODY_TRACKED_INDICES) {
-        const cur = landmarks[i];
-        const prev = this.previous[i];
-        if (cur && prev) {
-          sum += Math.hypot(cur.x - prev.x, cur.y - prev.y);
-          count += 1;
-        }
-      }
-      if (count > 0) {
-        this.deltaBuffer.push(sum / count);
-        if (this.deltaBuffer.length > DELTA_WINDOW) this.deltaBuffer.shift();
-      }
+      const displacement = averageDisplacement(landmarks, this.previous);
+      if (displacement !== null) this.deltas.push(displacement);
     }
     this.previous = landmarks;
 
-    const avgDelta =
-      this.deltaBuffer.length === 0
-        ? 0
-        : this.deltaBuffer.reduce((sum, d) => sum + d, 0) / this.deltaBuffer.length;
-
-    const rawScore = Math.max(0, Math.min(1, avgDelta / MAX_BODY_DELTA));
-    this.smoothedScore += (rawScore - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
-  }
-
-  private decay(): number {
-    this.smoothedScore += (0 - this.smoothedScore) * SCORE_SMOOTHING;
-    return this.smoothedScore;
+    return this.score.push(clamp01(this.deltas.average / MAX_BODY_DELTA));
   }
 
   reset(): void {
     this.previous = null;
-    this.deltaBuffer = [];
-    this.smoothedScore = 0;
+    this.deltas.reset();
+    this.score.reset();
   }
 }

@@ -1,15 +1,15 @@
 import type { Server } from 'socket.io';
 import {
   opposite,
-  roomCapacity,
   ROUND_RESULT_DELAY_MS,
-  ROUND_TIME_LIMIT_MS,
   TICK_RATE_MS,
   WINS_NEEDED,
+  type MatchEndReason,
+  type PausableStatus,
   type Room,
   type Side,
 } from './types.js';
-import { destroyRoom, resetRoomToLobby } from './roomManager.js';
+import { isRoomFull, stopRoundTimers } from './roomManager.js';
 import { getMiniGame } from './games/registry.js';
 import { logger } from './logger.js';
 
@@ -35,6 +35,15 @@ function startTickLoop(io: Server, room: Room): void {
   }, TICK_RATE_MS);
 }
 
+function tick(io: Server, room: Room): void {
+  const result = getMiniGame(room.gameType).tick(room);
+  broadcastState(io, room);
+
+  if (result.ended && result.winner) {
+    endRound(io, room, result.winner);
+  }
+}
+
 function startRound(io: Server, room: Room): void {
   room.roundNumber += 1;
   room.roundStartedAt = Date.now();
@@ -53,10 +62,7 @@ function startRound(io: Server, room: Room): void {
 }
 
 function endRound(io: Server, room: Room, winner: Side): void {
-  if (room.loopHandle) {
-    clearInterval(room.loopHandle);
-    room.loopHandle = null;
-  }
+  stopRoundTimers(room);
   room.roundWins[winner] += 1;
   room.status = 'ROUND_RESULT';
 
@@ -76,6 +82,10 @@ function endRound(io: Server, room: Room, winner: Side): void {
     return;
   }
 
+  scheduleNextRound(io, room);
+}
+
+function scheduleNextRound(io: Server, room: Room): void {
   room.roundResultTimeout = setTimeout(() => {
     if (room.status === 'ROUND_RESULT') {
       startRound(io, room);
@@ -83,20 +93,9 @@ function endRound(io: Server, room: Room, winner: Side): void {
   }, ROUND_RESULT_DELAY_MS);
 }
 
-export function endMatch(
-  io: Server,
-  room: Room,
-  winner: Side,
-  reason: 'ROUND_WINS' | 'DISCONNECT',
-): void {
-  if (room.loopHandle) {
-    clearInterval(room.loopHandle);
-    room.loopHandle = null;
-  }
-  if (room.roundResultTimeout) {
-    clearTimeout(room.roundResultTimeout);
-    room.roundResultTimeout = null;
-  }
+function endMatch(io: Server, room: Room, winner: Side, reason: MatchEndReason): void {
+  stopRoundTimers(room);
+  room.pause = null;
   room.status = 'MATCH_RESULT';
 
   logger.info({ roomId: room.id, winner, reason, finalScores: room.roundWins }, 'match ended');
@@ -108,48 +107,45 @@ export function endMatch(
   });
 }
 
-function tick(io: Server, room: Room): void {
-  const result = getMiniGame(room.gameType).tick(room);
-  broadcastState(io, room);
-
-  if (result.ended && result.winner) {
-    endRound(io, room, result.winner);
-  }
-}
-
 export function tryStartMatch(io: Server, room: Room): void {
-  if (room.status === 'READY' && room.players.length >= roomCapacity(room.mode)) {
+  if (room.status === 'READY' && isRoomFull(room)) {
     startRound(io, room);
   }
 }
 
+export function isPausable(status: Room['status']): status is PausableStatus {
+  return status === 'PLAYING' || status === 'ROUND_RESULT';
+}
+
+/** Freezes a round in progress (or the break between rounds) while a player is disconnected. */
 export function pauseForDisconnect(room: Room): void {
-  if (room.loopHandle) {
-    clearInterval(room.loopHandle);
-    room.loopHandle = null;
-  }
-  if (room.roundResultTimeout) {
-    clearTimeout(room.roundResultTimeout);
-    room.roundResultTimeout = null;
-  }
+  stopRoundTimers(room);
+  // A second player dropping while already paused keeps the original pause clock and resume target.
+  if (isPausable(room.status)) room.pause = { at: Date.now(), resumeTo: room.status };
   room.status = 'PAUSED';
 }
 
 export function resumeAfterReconnect(io: Server, room: Room): void {
+  const { at, resumeTo } = room.pause ?? { at: Date.now(), resumeTo: 'PLAYING' as const };
+  const pausedMs = Date.now() - at;
+  room.pause = null;
+  logger.info({ roomId: room.id, pausedMs, resumeTo }, 'match resumed after reconnect');
+
+  if (resumeTo === 'ROUND_RESULT') {
+    // The round had already ended - go back to the between-rounds break instead of reviving it.
+    room.status = 'ROUND_RESULT';
+    scheduleNextRound(io, room);
+    return;
+  }
+
+  // Shift every round deadline forward by the time spent paused, so the round
+  // resumes with exactly the time (and phase/cue time) it had left when it paused.
+  room.roundStartedAt += pausedMs;
+  getMiniGame(room.gameType).shiftDeadlines?.(room, pausedMs);
   room.status = 'PLAYING';
-  room.roundStartedAt = Date.now() - Math.min(Date.now() - room.roundStartedAt, ROUND_TIME_LIMIT_MS);
-  logger.info({ roomId: room.id }, 'match resumed after reconnect');
   startTickLoop(io, room);
 }
 
 export function forfeitToRemainingPlayer(io: Server, room: Room, disconnectedSide: Side): void {
   endMatch(io, room, opposite(disconnectedSide), 'DISCONNECT');
-}
-
-export function cleanupRoom(roomId: string): void {
-  destroyRoom(roomId);
-}
-
-export function backToLobby(room: Room): void {
-  resetRoomToLobby(room);
 }
