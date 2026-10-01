@@ -233,6 +233,9 @@ function leaveRoomAsPlayer(io: Server, socket: Socket, room: Room, player: Playe
   logger.info({ roomId: room.id, playerId: player.id, side: player.side }, 'player disconnected mid-match');
   io.to(room.id).emit('player:disconnect', { playerId: player.id, side: player.side });
   pauseForDisconnect(room);
+  // The tick loop (and its game:state status) just stopped, so this is the only way clients
+  // learn the room is PAUSED and who dropped - needed for the "waiting to reconnect" banner.
+  broadcastRoster(io, room);
 
   room.disconnectTimers[player.id] = setTimeout(() => {
     try {

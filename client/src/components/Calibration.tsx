@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useCameraPreview } from '../hooks/useCameraPreview';
 import { submitCalibration } from '../hooks/useGameSocket';
 import { useMotionCapture } from '../hooks/useMotionCapture';
 import { isExpressionEnabled } from '../lib/preferences';
@@ -13,6 +14,9 @@ export function Calibration() {
   const { videoRef, cameraState, faceDetected, beginCalibration, endCalibration } = useMotionCapture(expressionOn, {
     pose: false,
   });
+  // Motion-only players skip face capture, but keep the shared camera open so it's still
+  // live when the match starts (useMotionCapture above is inactive in that case).
+  useCameraPreview(!expressionOn);
 
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<'CAPTURING' | 'RETRY' | 'DONE'>('CAPTURING');

@@ -224,6 +224,17 @@ describe('match flow guards', () => {
     assert.equal(getRoom(hostSession.roomId), undefined);
   });
 
+  it('tells the remaining players the room is paused and who dropped', async () => {
+    const { host, guest, guestSession, room } = await createAndJoin();
+    stopLoops(room);
+    const roster = new Promise<{ status: string; players: { id: string; connectionStatus: string }[] }>((resolve) =>
+      host.on('room:player_joined', (p) => p.status === 'PAUSED' && resolve(p)),
+    );
+    guest.disconnect();
+    const paused = await roster;
+    assert.equal(paused.players.find((p) => p.id === guestSession.playerId)?.connectionStatus, 'DISCONNECTED');
+  });
+
   it('resumes a paused round when the dropped player reconnects', async () => {
     const { guest, guestSession, room } = await createAndJoin();
     stopLoops(room);

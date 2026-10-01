@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCameraPreview } from '../hooks/useCameraPreview';
 import { exitRoom } from '../hooks/useGameSocket';
 import { preloadVisionModels } from '../hooks/useMotionCapture';
 import { isExpressionEnabled } from '../lib/preferences';
@@ -49,6 +50,9 @@ export function WaitingRoom() {
   const players = useGameStore((s) => s.players);
   const setScreen = useGameStore((s) => s.setScreen);
   const [copyState, setCopyState] = useState<'IDLE' | 'COPIED' | 'FAILED'>('IDLE');
+  // Keeps the camera open through the wait (so the match starts on a live stream) and lets the
+  // player check their framing before it does.
+  const { videoRef: previewRef, state: previewState } = useCameraPreview();
 
   // Waiting for players is idle time: fetch the models now so the match starts without a load.
   const gameType = session?.gameType;
@@ -109,6 +113,17 @@ export function WaitingRoom() {
               mySide={session.side}
             />
           ))}
+        </div>
+
+        <div className="waiting-preview">
+          {previewState === 'UNAVAILABLE' ? (
+            <p className="hint small warn">카메라를 사용할 수 없어요. 브라우저의 카메라 권한을 확인해 주세요.</p>
+          ) : (
+            <>
+              <video ref={previewRef} className="preview mirrored small" muted playsInline />
+              <p className="hint small">내 카메라 · 상반신이 화면에 잘 들어오는지 확인해 주세요</p>
+            </>
+          )}
         </div>
 
         {full ? (

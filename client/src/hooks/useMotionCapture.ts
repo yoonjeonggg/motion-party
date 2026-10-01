@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { acquireCamera, releaseCamera } from '../lib/camera';
 import { ExpressionScoreTracker, rawExpressionIntensity } from '../lib/expressionScore';
 import { BodyMovementTracker, MotionScoreTracker } from '../lib/motionScore';
 import { classifyGesture, type Gesture } from '../lib/poseGesture';
@@ -143,7 +144,6 @@ export function useMotionCapture(
   const useBodyMovement = options.bodyMovement ?? true;
   const useGesture = options.gesture ?? true;
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const motionTrackerRef = useRef(new MotionScoreTracker());
   const bodyTrackerRef = useRef(new BodyMovementTracker());
   const expressionTrackerRef = useRef(new ExpressionScoreTracker());
@@ -166,6 +166,9 @@ export function useMotionCapture(
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
+    /** Whether this effect run holds a reference on the shared camera (see lib/camera.ts). */
+    let holding = false;
+    let attachedVideo: HTMLVideoElement | null = null;
 
     async function start() {
       setCameraState('REQUESTING');
@@ -178,20 +181,17 @@ export function useMotionCapture(
       ]);
       modelsPromise.catch(() => {});
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          // `ideal` (not exact) so phones whose front camera doesn't support 640x480
-          // exactly still get a stream; facingMode picks the selfie camera on mobile.
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-          audio: false,
-        });
+        // Shared across screens, so moving between them doesn't re-open the camera.
+        const stream = await acquireCamera();
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          releaseCamera();
           return;
         }
-        streamRef.current = stream;
+        holding = true;
         const video = videoRef.current;
         if (!video) return;
         video.srcObject = stream;
+        attachedVideo = video;
         await video.play();
 
         const [poseLandmarker, faceLandmarker] = await modelsPromise;
@@ -263,8 +263,9 @@ export function useMotionCapture(
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+      if (attachedVideo) attachedVideo.srcObject = null;
+      // Not stopping the tracks here: the next screen usually picks the same stream right back up.
+      if (holding) releaseCamera();
     };
     // usePose/useExpression are set once per mount by the caller; re-running this
     // effect on every render of a possibly-inline options object would tear down the camera.
