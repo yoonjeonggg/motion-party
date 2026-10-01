@@ -46,12 +46,15 @@ interface GameStore {
   lastRoundEnd: RoundEndPayload | null;
   matchEnd: MatchEndPayload | null;
   error: string | null;
+  /** True while the socket can't reach the server. */
+  connectionError: boolean;
   opponentDisconnected: boolean;
   highlight: Highlight | null;
 
   setNickname: (nickname: string) => void;
   setScreen: (screen: Screen) => void;
   setError: (message: string | null) => void;
+  setConnectionError: (failed: boolean) => void;
   applySession: (session: SessionInfo) => void;
   applyPlayers: (players: PublicPlayer[]) => void;
   applyRoomStatus: (status: RoomStatus) => void;
@@ -88,11 +91,13 @@ export const useGameStore = create<GameStore>((set) => ({
   nickname: '',
   session: null,
   error: null,
+  connectionError: false,
   ...initialGameFields,
 
   setNickname: (nickname) => set({ nickname }),
   setScreen: (screen) => set({ screen }),
   setError: (message) => set({ error: message }),
+  setConnectionError: (failed) => set({ connectionError: failed }),
 
   applySession: (session) => {
     storeSession(session);
@@ -128,6 +133,9 @@ export const useGameStore = create<GameStore>((set) => ({
       roundNumber: payload.roundNumber,
       roundWins: payload.roundWins,
       status: payload.status,
+      // Reconnecting mid-round resumes the match without a fresh game:start, so a
+      // player sitting on the WAITING screen has to be moved back into the game here.
+      screen: payload.status === 'PLAYING' && state.screen === 'WAITING' ? 'PLAYING' : state.screen,
     })),
 
   applyRoundEnd: (payload) =>

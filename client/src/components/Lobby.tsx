@@ -19,6 +19,7 @@ export function Lobby() {
   const setNickname = useGameStore((s) => s.setNickname);
   const error = useGameStore((s) => s.error);
   const setError = useGameStore((s) => s.setError);
+  const connectionError = useGameStore((s) => s.connectionError);
   const setScreen = useGameStore((s) => s.setScreen);
   const [codeInput, setCodeInput] = useState('');
   const [mode, setMode] = useState<RoomMode>('1v1');
@@ -109,6 +110,7 @@ export function Lobby() {
         </button>
 
         {error && <p className="error-text">{error}</p>}
+        {connectionError && <p className="error-text">서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.</p>}
       </div>
 
       <button type="button" className="ghost" onClick={() => setScreen('ONBOARDING')}>

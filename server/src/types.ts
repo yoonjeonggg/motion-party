@@ -9,6 +9,11 @@ export type RoomStatus =
 
 export type Side = 'A' | 'B';
 export type RoomMode = '1v1' | '2v2' | '4v4';
+export const ROOM_MODES: readonly RoomMode[] = ['1v1', '2v2', '4v4'];
+
+export function isRoomMode(value: unknown): value is RoomMode {
+  return typeof value === 'string' && (ROOM_MODES as readonly string[]).includes(value);
+}
 export type MatchEndReason = 'ROUND_WINS' | 'DISCONNECT';
 /** Statuses a disconnect can pause (a round in progress, or the break between rounds). */
 export type PausableStatus = 'PLAYING' | 'ROUND_RESULT';
@@ -89,3 +94,6 @@ export const ROUND_TIME_LIMIT_MS = 30_000;
 export const ROUND_RESULT_DELAY_MS = 3_000;
 export const RECONNECT_GRACE_MS = 30_000;
 export const WINS_NEEDED = 2;
+/** Inputs older than this are treated as 0 (e.g. a backgrounded tab stops sending), so a stale value can't keep pulling. */
+export const INPUT_STALE_MS = 1_000;
+export const NICKNAME_MAX_LENGTH = 12;

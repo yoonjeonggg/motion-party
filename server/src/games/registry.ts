@@ -13,6 +13,10 @@ const registry: Record<string, MiniGameModule> = {
 
 export const DEFAULT_GAME_TYPE = TUG_OF_WAR_ID;
 
+export function isKnownGameType(value: unknown): value is string {
+  return typeof value === 'string' && Object.hasOwn(registry, value);
+}
+
 /** Falls back to the default game for an unknown/omitted gameType. */
 export function getMiniGame(gameType: string): MiniGameModule {
   return registry[gameType] ?? tugOfWarModule;

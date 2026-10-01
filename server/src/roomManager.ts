@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  INPUT_STALE_MS,
   perSideCapacity,
   roomCapacity,
   type Player,
@@ -85,8 +86,9 @@ export type JoinResult =
   | { ok: true; room: Room; player: Player }
   | { ok: false; reason: 'NOT_FOUND' | 'FULL' | 'ALREADY_STARTED' };
 
-export function joinRoom(code: string, socketId: string, nickname: string): JoinResult {
-  const roomId = roomsByCode.get(code.toUpperCase());
+export function joinRoom(code: unknown, socketId: string, nickname: string): JoinResult {
+  if (typeof code !== 'string') return { ok: false, reason: 'NOT_FOUND' };
+  const roomId = roomsByCode.get(code.trim().toUpperCase());
   if (!roomId) return { ok: false, reason: 'NOT_FOUND' };
   const room = rooms.get(roomId);
   if (!room) return { ok: false, reason: 'NOT_FOUND' };
@@ -108,12 +110,15 @@ export function joinRoom(code: string, socketId: string, nickname: string): Join
   return { ok: true, room, player };
 }
 
-/** Marks a player as having submitted their expression baseline. Returns true once everyone in the room has. */
+/**
+ * Marks a player as having submitted their expression baseline. Returns true once everyone in the room has.
+ * Only a CALIBRATING room advances to READY - a late/duplicate submit mid-match must not restart the round.
+ */
 export function markCalibrated(room: Room, playerId: string): boolean {
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return false;
   player.calibrated = true;
-  const allDone = isRoomFull(room) && room.players.every((p) => p.calibrated);
+  const allDone = room.status === 'CALIBRATING' && isRoomFull(room) && room.players.every((p) => p.calibrated);
   if (allDone) room.status = 'READY';
   return allDone;
 }
@@ -163,6 +168,24 @@ export function stopRoundTimers(room: Room): void {
   }
 }
 
+/** Drops a player from the roster, clearing any reconnect grace timer they still had running. */
+export function removePlayer(room: Room, playerId: string): void {
+  const timer = room.disconnectTimers[playerId];
+  if (timer) clearTimeout(timer);
+  delete room.disconnectTimers[playerId];
+  room.players = room.players.filter((p) => p.id !== playerId);
+}
+
+/** Zeroes the scores of players whose input stream went quiet, so their last value doesn't keep counting. */
+export function decayStaleInputs(room: Room, now: number): void {
+  for (const player of room.players) {
+    if (now - player.lastInputAt > INPUT_STALE_MS) {
+      player.motionScore = 0;
+      player.expressionScore = 0;
+    }
+  }
+}
+
 export function destroyRoom(roomId: string): void {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -177,8 +200,10 @@ export function destroyRoom(roomId: string): void {
 export function resetRoomToLobby(room: Room): void {
   for (const player of room.players) {
     player.calibrated = false;
+    player.motionScore = 0;
     player.expressionScore = 0;
   }
+  room.pause = null;
   room.status = isRoomFull(room) ? fullRoomStatus(room) : 'LOBBY';
   room.roundNumber = 0;
   room.roundWins = { A: 0, B: 0 };

@@ -61,13 +61,19 @@ type Delegate = 'GPU' | 'CPU';
 function sharedLandmarker<T>(create: (fileset: WasmFileset, delegate: Delegate) => Promise<T>): () => Promise<T> {
   let promise: Promise<T> | null = null;
   return () => {
-    promise ??= FilesetResolver.forVisionTasks(WASM_BASE).then(async (fileset) => {
-      try {
-        return await create(fileset, 'GPU');
-      } catch {
-        return create(fileset, 'CPU');
-      }
-    });
+    promise ??= FilesetResolver.forVisionTasks(WASM_BASE)
+      .then(async (fileset) => {
+        try {
+          return await create(fileset, 'GPU');
+        } catch {
+          return create(fileset, 'CPU');
+        }
+      })
+      .catch((err: unknown) => {
+        // Don't cache a failure (e.g. a flaky model download) - let the next screen retry.
+        promise = null;
+        throw err;
+      });
     return promise;
   };
 }
@@ -157,37 +163,42 @@ export function useMotionCapture(
           if (cancelled) return;
           if (time - lastFrameTimeRef.current >= FRAME_INTERVAL_MS && video.readyState >= 2) {
             lastFrameTimeRef.current = time;
-            frameIndexRef.current += 1;
-            const now = performance.now();
+            try {
+              frameIndexRef.current += 1;
+              const now = performance.now();
 
-            if (poseLandmarker) {
-              const poseResult = poseLandmarker.detectForVideo(video, now);
-              const landmarks = poseResult.landmarks[0] ?? null;
-              // Only track/setState the scores this caller actually reads - each
-              // setState is a re-render, and most screens only need one of the three.
-              if (useMotion) setMotionScore(motionTrackerRef.current.update(landmarks));
-              if (useBodyMovement) setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
-              if (useGesture) setGesture(classifyGesture(landmarks));
-              if (poseDetectedRef.current !== Boolean(landmarks)) {
-                poseDetectedRef.current = Boolean(landmarks);
-                setPoseDetected(poseDetectedRef.current);
+              if (poseLandmarker) {
+                const poseResult = poseLandmarker.detectForVideo(video, now);
+                const landmarks = poseResult.landmarks[0] ?? null;
+                // Only track/setState the scores this caller actually reads - each
+                // setState is a re-render, and most screens only need one of the three.
+                if (useMotion) setMotionScore(motionTrackerRef.current.update(landmarks));
+                if (useBodyMovement) setBodyMovementScore(bodyTrackerRef.current.update(landmarks));
+                if (useGesture) setGesture(classifyGesture(landmarks));
+                if (poseDetectedRef.current !== Boolean(landmarks)) {
+                  poseDetectedRef.current = Boolean(landmarks);
+                  setPoseDetected(poseDetectedRef.current);
+                }
               }
-            }
 
-            // Throttled: see FACE_INFERENCE_EVERY_N_FRAMES.
-            if (faceLandmarker && frameIndexRef.current % FACE_INFERENCE_EVERY_N_FRAMES === 0) {
-              const faceResult = faceLandmarker.detectForVideo(video, now);
-              const categories = faceResult.faceBlendshapes[0]?.categories;
-              const raw = rawExpressionIntensity(categories);
-              if (faceDetectedRef.current !== (raw !== null)) {
-                faceDetectedRef.current = raw !== null;
-                setFaceDetected(faceDetectedRef.current);
+              // Throttled: see FACE_INFERENCE_EVERY_N_FRAMES.
+              if (faceLandmarker && frameIndexRef.current % FACE_INFERENCE_EVERY_N_FRAMES === 0) {
+                const faceResult = faceLandmarker.detectForVideo(video, now);
+                const categories = faceResult.faceBlendshapes[0]?.categories;
+                const raw = rawExpressionIntensity(categories);
+                if (faceDetectedRef.current !== (raw !== null)) {
+                  faceDetectedRef.current = raw !== null;
+                  setFaceDetected(faceDetectedRef.current);
+                }
+                if (calibratingRef.current) {
+                  if (raw !== null) calibrationSamplesRef.current.push(raw);
+                } else {
+                  setExpressionScore(expressionTrackerRef.current.update(raw));
+                }
               }
-              if (calibratingRef.current) {
-                if (raw !== null) calibrationSamplesRef.current.push(raw);
-              } else {
-                setExpressionScore(expressionTrackerRef.current.update(raw));
-              }
+            } catch (err) {
+              // One bad frame (e.g. a GPU context hiccup) shouldn't kill the loop and freeze the scores.
+              console.warn('[motion] frame inference failed', err);
             }
           }
           rafRef.current = requestAnimationFrame(loop);

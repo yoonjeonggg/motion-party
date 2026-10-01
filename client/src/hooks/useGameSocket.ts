@@ -37,7 +37,20 @@ const handlers = {
   'game:round_end': (payload: RoundEndPayload) => useGameStore.getState().applyRoundEnd(payload),
   'game:match_end': (payload: MatchEndPayload) => useGameStore.getState().applyMatchEnd(payload),
   'player:disconnect': () => useGameStore.getState().applyOpponentDisconnected(true),
-  'player:reconnect_error': () => useGameStore.getState().leaveRoom(),
+  'player:reconnect_error': () => {
+    const store = useGameStore.getState();
+    store.leaveRoom();
+    store.setError('연결이 끊겨 방에서 나왔어요. 다시 참가해 주세요.');
+  },
+  // Every (re)connect gets a new socket id, so the server only knows us again once we
+  // re-claim our seat - covers both a page reload and socket.io's automatic reconnect
+  // after a network blip (otherwise we'd silently forfeit after the grace period).
+  connect: () => {
+    useGameStore.getState().setConnectionError(false);
+    const session = useGameStore.getState().session;
+    if (session) socket.emit('player:reconnect', { roomId: session.roomId, playerId: session.playerId });
+  },
+  connect_error: () => useGameStore.getState().setConnectionError(true),
 } as const;
 
 export function useGameSocket() {
@@ -46,8 +59,9 @@ export function useGameSocket() {
 
     const stored = loadStoredSession<SessionInfo>();
     if (stored) {
-      socket.emit('player:reconnect', { roomId: stored.roomId, playerId: stored.playerId });
       useGameStore.getState().applySession(stored);
+      // Already connected before this effect ran: the connect handler above missed it.
+      if (socket.connected) handlers.connect();
     }
 
     return () => {

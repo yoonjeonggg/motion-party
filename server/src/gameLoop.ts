@@ -9,7 +9,7 @@ import {
   type Room,
   type Side,
 } from './types.js';
-import { isRoomFull, stopRoundTimers } from './roomManager.js';
+import { decayStaleInputs, isRoomFull, stopRoundTimers } from './roomManager.js';
 import { getMiniGame } from './games/registry.js';
 import { logger } from './logger.js';
 
@@ -36,6 +36,7 @@ function startTickLoop(io: Server, room: Room): void {
 }
 
 function tick(io: Server, room: Room): void {
+  decayStaleInputs(room, Date.now());
   const result = getMiniGame(room.gameType).tick(room);
   broadcastState(io, room);
 
@@ -87,8 +88,12 @@ function endRound(io: Server, room: Room, winner: Side): void {
 
 function scheduleNextRound(io: Server, room: Room): void {
   room.roundResultTimeout = setTimeout(() => {
-    if (room.status === 'ROUND_RESULT') {
+    room.roundResultTimeout = null;
+    if (room.status !== 'ROUND_RESULT') return;
+    try {
       startRound(io, room);
+    } catch (err) {
+      logger.error({ roomId: room.id, gameType: room.gameType, err }, 'next round start error');
     }
   }, ROUND_RESULT_DELAY_MS);
 }
