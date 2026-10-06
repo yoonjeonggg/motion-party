@@ -73,7 +73,13 @@ body:has(.screen.tutorial) {
 /* Calibration/tutorial cards hold a single full-size camera preview - let
    them grow wider than the default card cap so the preview reads bigger. */
 .card:has(> .preview:not(.small)) {
-  max-width: 640px;
+  max-width: 720px;
+}
+
+/* Play screens put two camera panels side by side - give them more room than the
+   default 720px column so each preview reads bigger on desktop. */
+#root:has(.screen.play) {
+  max-width: 960px;
 }
 
 .screen.tutorial .card,
@@ -270,7 +276,7 @@ button.primary:hover {
   width: 100%;
   aspect-ratio: 4 / 3;
   /* Keep the camera from pushing the instructions and buttons below the fold. */
-  max-height: 42svh;
+  max-height: 50svh;
   border-radius: 12px;
   background: #000;
   object-fit: cover;
@@ -615,7 +621,7 @@ button.primary:hover {
 .player-panel {
   flex: 1;
   min-width: 0;
-  max-width: 280px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -636,7 +642,7 @@ button.primary:hover {
   font-size: 14px;
   color: var(--text);
   /* Roughly the vertical middle of the 4:3 camera previews beside it. */
-  margin-top: clamp(40px, 15vw, 90px);
+  margin-top: clamp(40px, 15vw, 150px);
 }
 
 .screen.tutorial {
