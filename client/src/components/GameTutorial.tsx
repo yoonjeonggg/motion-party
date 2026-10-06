@@ -6,6 +6,7 @@ import { GESTURE_LABELS, SIMON_SAYS_GESTURES } from '../lib/poseGesture';
 import { hasSeenGameTutorial, markGameTutorialSeen } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_GAME_TYPE, isTugStyleGame, type GameType } from '../types';
+import { DemoFigure } from './DemoFigure';
 import { Gauge } from './ui/Gauge';
 
 const PULL_THRESHOLD = 0.5;
@@ -17,7 +18,7 @@ const SYNC_MAX_BONUS = 0.3;
 const SYNC_BONUS_TARGET = 0.2;
 const SYNC_RHYTHM_PERIOD_MS = 1_400;
 const SIMON_CUE_MS = 2_500;
-/** CSS class animating the demo figure into each gesture. */
+/** DemoFigure variant posing the figure into each gesture. */
 const SIMON_CLASS: Record<(typeof SIMON_SAYS_GESTURES)[number], string> = {
   LEFT_ARM_UP: 'simon-left-arm-up',
   RIGHT_ARM_UP: 'simon-right-arm-up',
@@ -200,15 +201,7 @@ export function GameTutorial() {
       {(cameraState === 'REQUESTING' || cameraState === 'READY') && (
         <div className="card">
           {!isSync && (
-            <div className={`demo-figure ${demoVariant}`}>
-              <div className="demo-head" />
-              <div className="demo-body" />
-              <div className="demo-arm demo-arm-left" />
-              <div className="demo-arm demo-arm-right" />
-              <div className="demo-leg demo-leg-left" />
-              <div className="demo-leg demo-leg-right" />
-              {isFreezeTag && freeze.isFreeze && <div className="demo-ice">❄️</div>}
-            </div>
+            <DemoFigure variant={demoVariant} rope={isTugStyle} />
           )}
 
           {isFreezeTag ? (
