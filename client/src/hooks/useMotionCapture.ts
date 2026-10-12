@@ -21,6 +21,11 @@ const FACE_INFERENCE_EVERY_N_FRAMES = 3;
 
 export type CameraState = 'IDLE' | 'REQUESTING' | 'READY' | 'DENIED' | 'ERROR';
 
+/** The camera won't come up without the user doing something (granting permission, reloading). */
+export function isCameraFailed(state: CameraState): boolean {
+  return state === 'DENIED' || state === 'ERROR';
+}
+
 interface UseMotionCaptureOptions {
   /** Whether to also run FaceLandmarker for expression scoring. Default true; disable for games that don't use it (perf). */
   expression?: boolean;

@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
-import type { CameraState } from '../hooks/useMotionCapture';
+import { isCameraFailed, type CameraState } from '../hooks/useMotionCapture';
 import { joinNicknames, splitTeams } from '../lib/teams';
 import { useGameStore } from '../store/gameStore';
 
@@ -55,7 +55,7 @@ export function PlayLayout({ gameLabel, arena, videoRef, poseDetected, cameraSta
             {me?.nickname ?? '나'} (나)
             {teammates.length > 0 && ` · ${joinNicknames(teammates)}`}
           </p>
-          {cameraState === 'DENIED' || cameraState === 'ERROR' ? (
+          {isCameraFailed(cameraState) ? (
             <p className="hint small warn">카메라를 사용할 수 없어요. 권한을 확인한 뒤 새로고침해 주세요.</p>
           ) : (
             cameraState === 'READY' &&

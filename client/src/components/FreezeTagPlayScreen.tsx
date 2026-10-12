@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { GAME_LABELS, opposite } from '../types';
 import { PlayLayout } from './PlayLayout';
 import { Gauge } from './ui/Gauge';
+import { TeamScore } from './ui/TeamScore';
 
 /** Play screen for 얼음땡 (freeze tag): move as much as possible, then freeze on cue. */
 export function FreezeTagPlayScreen() {
@@ -39,12 +40,10 @@ export function FreezeTagPlayScreen() {
       myStats={
         <>
           <Gauge value={bodyMovementScore} alt={isFreeze} />
-          <p className="hint small">누적 점수 {(teamPower[session.side] ?? 0).toFixed(1)}</p>
+          <TeamScore value={teamPower[session.side]} />
         </>
       }
-      opponentStats={
-        <p className="hint small">누적 점수 {(teamPower[opposite(session.side)] ?? 0).toFixed(1)}</p>
-      }
+      opponentStats={<TeamScore value={teamPower[opposite(session.side)]} />}
     />
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCameraPreview } from '../hooks/useCameraPreview';
 import { submitCalibration } from '../hooks/useGameSocket';
-import { useMotionCapture } from '../hooks/useMotionCapture';
+import { isCameraFailed, useMotionCapture } from '../hooks/useMotionCapture';
 import { isExpressionEnabled } from '../lib/preferences';
 import { useGameStore } from '../store/gameStore';
 
@@ -75,7 +75,7 @@ export function Calibration() {
     submitCalibration(session.roomId, session.playerId, 0);
   }
 
-  const cameraFailed = cameraState === 'DENIED' || cameraState === 'ERROR';
+  const cameraFailed = isCameraFailed(cameraState);
 
   if (!session) return null;
 

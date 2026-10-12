@@ -6,6 +6,7 @@ import { useGameStore } from '../store/gameStore';
 import { GAME_LABELS, opposite } from '../types';
 import { PlayLayout } from './PlayLayout';
 import { Gauge } from './ui/Gauge';
+import { TeamScore } from './ui/TeamScore';
 
 /** Play screen for 동작 따라하기 (simon says): mimic the cued pose as closely as possible before it rotates. */
 export function SimonSaysPlayScreen() {
@@ -46,12 +47,10 @@ export function SimonSaysPlayScreen() {
         <>
           <p className="hint small">{matched ? '일치! 👍' : `내 동작: ${GESTURE_LABELS[gesture]}`}</p>
           <Gauge value={matched ? 1 : 0} alt={!matched} />
-          <p className="hint small">누적 점수 {(teamPower[session.side] ?? 0).toFixed(1)}</p>
+          <TeamScore value={teamPower[session.side]} />
         </>
       }
-      opponentStats={
-        <p className="hint small">누적 점수 {(teamPower[opposite(session.side)] ?? 0).toFixed(1)}</p>
-      }
+      opponentStats={<TeamScore value={teamPower[opposite(session.side)]} />}
     />
   );
 }

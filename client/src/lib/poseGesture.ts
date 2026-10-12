@@ -71,5 +71,6 @@ export class GestureMatchTracker {
 }
 
 export function isGesture(value: string): value is Gesture {
-  return value in GESTURE_LABELS;
+  // hasOwn, not `in`: inherited keys like 'toString' aren't gestures.
+  return Object.hasOwn(GESTURE_LABELS, value);
 }
