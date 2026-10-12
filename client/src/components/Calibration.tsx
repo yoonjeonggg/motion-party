@@ -39,7 +39,9 @@ export function Calibration() {
   // (cameraState stays READY, so it alone wouldn't re-trigger this effect).
   useEffect(() => {
     if (!expressionOn || cameraState !== 'READY') return;
-    everDetectedRef.current = false;
+    // Seed from the face's current state: the effect above only fires on a *change*, so a face that's
+    // already in view when "다시 시도" is pressed would otherwise never count and the retry always fails.
+    everDetectedRef.current = faceDetected;
     beginCalibration();
 
     const startedAt = performance.now();
