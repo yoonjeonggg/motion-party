@@ -19,5 +19,6 @@ export function isKnownGameType(value: unknown): value is string {
 
 /** Falls back to the default game for an unknown/omitted gameType. */
 export function getMiniGame(gameType: string): MiniGameModule {
-  return registry[gameType] ?? tugOfWarModule;
+  // hasOwn, not `??`: inherited keys like '__proto__' would otherwise resolve to Object.prototype.
+  return isKnownGameType(gameType) ? registry[gameType]! : tugOfWarModule;
 }

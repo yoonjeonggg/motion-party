@@ -1,11 +1,13 @@
 import type { Server, Socket } from 'socket.io';
 import {
+  clearDisconnectTimer,
   createRoom,
   destroyRoom,
   findRoomBySocketId,
   findRoomByPlayerId,
   joinRoom,
   markCalibrated,
+  normalizeRoomCode,
   removePlayer,
   resetRoomToLobby,
   toPublicPlayers,
@@ -54,7 +56,6 @@ function sanitizeNickname(value: unknown, fallback: string): string {
  * player's current socket - otherwise anyone who learned a playerId could drive their input.
  */
 function findOwnPlayer(socket: Socket, roomId: unknown, playerId: unknown) {
-  if (typeof roomId !== 'string' || typeof playerId !== 'string') return undefined;
   const found = findRoomByPlayerId(roomId, playerId);
   return found && found.player.socketId === socket.id ? found : undefined;
 }
@@ -100,7 +101,7 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
 
   on<{ code: string; nickname: string }>(socket, 'room:join', ({ code, nickname }) => {
     const current = findRoomBySocketId(socket.id);
-    if (current && typeof code === 'string' && current.room.code === code.trim().toUpperCase()) {
+    if (current && current.room.code === normalizeRoomCode(code)) {
       // Already in this room (double-click / duplicate emit): just resend the session.
       socket.emit('room:joined', sessionPayload(current.room, current.player));
       return;
@@ -153,18 +154,13 @@ export function registerSocketHandlers(io: Server, socket: Socket): void {
   );
 
   on<{ roomId: string; playerId: string }>(socket, 'player:reconnect', ({ roomId, playerId }) => {
-    const found =
-      typeof roomId === 'string' && typeof playerId === 'string' ? findRoomByPlayerId(roomId, playerId) : undefined;
+    const found = findRoomByPlayerId(roomId, playerId);
     if (!found) {
       socket.emit('player:reconnect_error', { reason: 'NOT_FOUND' });
       return;
     }
     const { room, player } = found;
-    const timer = room.disconnectTimers[player.id];
-    if (timer) {
-      clearTimeout(timer);
-      delete room.disconnectTimers[player.id];
-    }
+    clearDisconnectTimer(room, player.id);
     player.socketId = socket.id;
     player.connectionStatus = 'CONNECTED';
     player.lastInputAt = Date.now();

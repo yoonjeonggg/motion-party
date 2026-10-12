@@ -86,9 +86,15 @@ export type JoinResult =
   | { ok: true; room: Room; player: Player }
   | { ok: false; reason: 'NOT_FOUND' | 'FULL' | 'ALREADY_STARTED' };
 
+/** Room codes are typed by hand, so surrounding whitespace and lowercase are accepted. */
+export function normalizeRoomCode(code: unknown): string | null {
+  return typeof code === 'string' ? code.trim().toUpperCase() : null;
+}
+
 export function joinRoom(code: unknown, socketId: string, nickname: string): JoinResult {
-  if (typeof code !== 'string') return { ok: false, reason: 'NOT_FOUND' };
-  const roomId = roomsByCode.get(code.trim().toUpperCase());
+  const normalized = normalizeRoomCode(code);
+  if (normalized === null) return { ok: false, reason: 'NOT_FOUND' };
+  const roomId = roomsByCode.get(normalized);
   if (!roomId) return { ok: false, reason: 'NOT_FOUND' };
   const room = rooms.get(roomId);
   if (!room) return { ok: false, reason: 'NOT_FOUND' };
@@ -135,10 +141,12 @@ export function findRoomBySocketId(socketId: string): { room: Room; player: Play
   return undefined;
 }
 
+/** Takes ids straight off the wire: anything that isn't a string simply isn't found. */
 export function findRoomByPlayerId(
-  roomId: string,
-  playerId: string,
+  roomId: unknown,
+  playerId: unknown,
 ): { room: Room; player: Player } | undefined {
+  if (typeof roomId !== 'string' || typeof playerId !== 'string') return undefined;
   const room = rooms.get(roomId);
   if (!room) return undefined;
   const player = room.players.find((p) => p.id === playerId);
@@ -168,11 +176,16 @@ export function stopRoundTimers(room: Room): void {
   }
 }
 
-/** Drops a player from the roster, clearing any reconnect grace timer they still had running. */
-export function removePlayer(room: Room, playerId: string): void {
+/** Cancels a player's reconnect grace timer, if one is running. */
+export function clearDisconnectTimer(room: Room, playerId: string): void {
   const timer = room.disconnectTimers[playerId];
   if (timer) clearTimeout(timer);
   delete room.disconnectTimers[playerId];
+}
+
+/** Drops a player from the roster, clearing any reconnect grace timer they still had running. */
+export function removePlayer(room: Room, playerId: string): void {
+  clearDisconnectTimer(room, playerId);
   room.players = room.players.filter((p) => p.id !== playerId);
 }
 
@@ -190,9 +203,7 @@ export function destroyRoom(roomId: string): void {
   const room = rooms.get(roomId);
   if (!room) return;
   stopRoundTimers(room);
-  for (const timer of Object.values(room.disconnectTimers)) {
-    if (timer) clearTimeout(timer);
-  }
+  for (const playerId of Object.keys(room.disconnectTimers)) clearDisconnectTimer(room, playerId);
   rooms.delete(roomId);
   roomsByCode.delete(room.code);
 }
