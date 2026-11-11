@@ -11,7 +11,8 @@ import { Gauge } from './ui/Gauge';
 
 const PULL_THRESHOLD = 0.5;
 const MOVE_PHASE_MS = 4_000;
-const FREEZE_PHASE_MS = 3_000;
+/** Matches the server's freeze_tag FREEZE phase (server/src/games/freezeTag.ts). */
+const FREEZE_PHASE_MS = 2_500;
 const FREEZE_DEMO_THRESHOLD = 0.15;
 /** Mirrors server SYNC_MAX_BONUS (server/src/games/tugStyle.ts) so the demo's numbers match the real match. */
 const SYNC_MAX_BONUS = 0.3;
@@ -212,7 +213,7 @@ export function GameTutorial() {
             <div className="banner phase-banner move">지금 동작: {GESTURE_LABELS[simon.cue]}!</div>
           ) : isSync ? (
             <>
-              <p className="instruction">2:2 팀전은 팀원과 타이밍이 맞을수록 팀 파워가 더 세져요!</p>
+              <p className="instruction">{session?.mode === '4v4' ? '4:4' : '2:2'} 팀전은 팀원과 타이밍이 맞을수록 팀 파워가 더 세져요!</p>
               <p className="hint small">아래 연습 팀원의 리듬에 맞춰 같이 당겨보세요.</p>
             </>
           ) : (

@@ -103,6 +103,18 @@ describe('GameTutorial: tug-style', () => {
     fireEvent.click(proceedButton()!);
     expectProceeded('tug_of_war');
   });
+
+  it.each([
+    ['2v2', '2:2 팀전은'],
+    ['4v4', '4:4 팀전은'],
+  ] as const)('%s: the sync step names the actual team mode', (mode, text) => {
+    installManualRaf();
+    enterRoom({ gameType: 'tug_of_war', mode });
+    motion.motionScore = 0.7;
+    render(<GameTutorial />);
+    click('다음: 팀워크 연습');
+    expect(screen.getByText(new RegExp(text))).toBeInTheDocument();
+  });
 });
 
 describe('GameTutorial: freeze tag', () => {
@@ -122,7 +134,7 @@ describe('GameTutorial: freeze tag', () => {
     expect(screen.getByText(/앗! 움직였어요/)).toBeInTheDocument();
     expect(proceedButton()).toBeNull();
 
-    act(() => vi.advanceTimersByTime(3_000));
+    act(() => vi.advanceTimersByTime(2_500));
     expect(screen.queryByText(/앗! 움직였어요/)).toBeNull();
     fireEvent.click(proceedButton()!);
     expectProceeded('freeze_tag');
