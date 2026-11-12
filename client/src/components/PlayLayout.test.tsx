@@ -87,7 +87,7 @@ describe('PlayLayout', () => {
   it('asks to reframe only when the camera works but no body is visible', () => {
     enterRoom();
     const { rerender } = renderLayout({ poseDetected: false });
-    expect(screen.getByText(/몸이 화면에 잘 보이도록/)).toBeInTheDocument();
+    expect(screen.getByText(/카메라 각도를 조정해주세요/)).toBeInTheDocument();
     rerender(
       <PlayLayout
         gameLabel="x"
@@ -99,6 +99,6 @@ describe('PlayLayout', () => {
         opponentStats={null}
       />,
     );
-    expect(screen.queryByText(/몸이 화면에 잘 보이도록/)).toBeNull();
+    expect(screen.queryByText(/카메라 각도를 조정해주세요/)).toBeNull();
   });
 });

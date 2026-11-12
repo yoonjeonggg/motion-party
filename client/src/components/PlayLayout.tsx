@@ -59,7 +59,7 @@ export function PlayLayout({ gameLabel, arena, videoRef, poseDetected, cameraSta
             <p className="hint small warn">카메라를 사용할 수 없어요. 권한을 확인한 뒤 새로고침해 주세요.</p>
           ) : (
             cameraState === 'READY' &&
-            !poseDetected && <p className="hint small warn">몸이 화면에 잘 보이도록 조정해 주세요</p>
+            !poseDetected && <p className="hint small warn">카메라 각도를 조정해주세요</p>
           )}
           {myStats}
         </div>
